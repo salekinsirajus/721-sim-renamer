@@ -14,11 +14,13 @@ private:
     // Structure 1: Rename Map Table
     // Entry contains: physical register mapping
     /////////////////////////////////////////////////////////////////////
+    int *rmt; 
 
     /////////////////////////////////////////////////////////////////////
     // Structure 2: Architectural Map Table
     // Entry contains: physical register mapping
     /////////////////////////////////////////////////////////////////////
+    int *amt;
 
     /////////////////////////////////////////////////////////////////////
     // Structure 3: Free List
@@ -161,7 +163,12 @@ public:
     renamer(uint64_t n_log_regs,
         uint64_t n_phys_regs,
         uint64_t n_branches,
-        uint64_t n_active);
+        uint64_t n_active){
+      
+        //initialize the data structures
+        rmt = new int[n_log_regs]; 
+        amt = new int[n_log_regs];
+    }
 
     /////////////////////////////////////////////////////////////////////
     // This is the destructor, used to clean up memory space and
