@@ -31,8 +31,10 @@ private:
         int tail, tail_phase;
         int *list; //array, could be vector as well
     } free_list;
+
+    int free_list_size;    
+    free_list fl; 
     /* How to use:
-        free_list fl; 
         fl.head = 0;
         fl.list = new int[free_list_size];  //user input free_list_size
         fl.head = 0; 
