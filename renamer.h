@@ -533,4 +533,9 @@ public:
     // Query the exception bit of the indicated entry in the Active List.
     /////////////////////////////////////////////////////////////////////
     bool get_exception(uint64_t AL_index);
+
+    //////////////////////////////////////////
+    // Helper functions later implemented  .//
+    //////////////////////////////////////////
+    int free_registers(free_list_t *free_list, int free_list_size);
 };

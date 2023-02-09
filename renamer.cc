@@ -39,7 +39,7 @@ renamer::renamer(uint64_t n_log_regs,
     }
 }
 
-int  free_registers(free_list_t *free_list, int free_list_size){
+int renamer::free_registers(free_list_t *free_list, int free_list_size){
     //case 1: head and tail are at the same location
     if (free_list->head == free_list->tail){
         if (free_list->head_phase != free_list->tail_phase){
