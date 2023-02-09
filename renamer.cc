@@ -26,6 +26,47 @@ renamer::renamer(uint64_t n_log_regs,
         al.list[i] = {};
     }
     
+    //free list
+    //free list size (721ss-prf-2 slide, p19), eq prf - n_log_regs
+    free_list_size = n_phys_regs - n_log_regs;
+    fl.list = new int[free_list_size];
+    fl.head = 0;
+    fl.tail = 0;
+    fl.head_phase = 0;
+    fl.tail_phase = 0;
+    for (i=0; i <free_list_size; i++){
+        fl.list[i] = 0;
+    }
+}
+
+int  free_registers(free_list_t *free_list, int free_list_size){
+    //case 1: head and tail are at the same location
+    if (free_list->head == free_list->tail){
+        if (free_list->head_phase != free_list->tail_phase){
+            return 0;
+        } else {
+            return free_list_size;
+        }
+    }
+    //case 2: head and tail are at different locations
+    //between H and T: free regs (adjust based on the rotations)
+    //between T and H: occupied in the AL
+    //TODO: WIP
+    
+}
+
+bool renamer::stall_reg(uint64_t bundle_dst){
+    //how do we know how many free physical registers
+    //are available? Is it the free list? TODO: verify
+    //if the number of available registers are less than
+    //the input return false, otherwise return true
+
+    int available_physical_regs = free_registers(&this->fl, this->free_list_size);
+    if (available_physical_regs < bundle_dst){
+        return false;
+    }
+    
+    return true;
 }
 
 bool renamer::is_ready(uint64_t phys_reg){
