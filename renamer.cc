@@ -31,7 +31,38 @@ renamer::renamer(uint64_t n_log_regs,
 bool renamer::is_ready(uint64_t phys_reg){
     //TODO: check validity of the input
     //TODO: is this phys_reg 0 or 1 indexed?
-    return prf_ready[phys_reg];
+    return this->prf_ready[phys_reg];
+}
+
+void renamer::clear_ready(uint64_t phys_reg){
+    //TODO: check validity of the input
+    //TODO: is this phys_reg 0 or 1 indexed?
+    this->prf_ready[phys_reg] = 0;
+}
+
+void renamer::set_ready(uint64_t phys_reg){
+    //TODO: check validity of the input
+    //TODO: is this phys_reg 0 or 1 indexed?
+    this->prf_ready[phys_reg] = 1;
+}
+
+uint64_t renamer::read(uint64_t phys_reg){
+    //TODO: check validity of the input
+    //TODO: is this phys_reg 0 or 1 indexed?
+    return this->prf[phys_reg];
+}
+
+void renamer::write(uint64_t phys_reg, uint64_t value){
+    //TODO: check validity of the input
+    //TODO: is this phys_reg 0 or 1 indexed?
+    this->prf[phys_reg] = value; 
+    //TODO: does this involve ALSO setting the ready bit?
+    //TODO: look into this more
+}
+
+void renamer::set_complete(uint64_t AL_index){
+    //TODO: check validity of the input
+    this->al.list[AL_index].completed = 1; 
 }
 
 bool renamer::stall_branch(uint64_t bundle_branch){
