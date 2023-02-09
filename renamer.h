@@ -10,11 +10,13 @@ private:
     // Structure 1: Rename Map Table
     // Entry contains: physical register mapping
     /////////////////////////////////////////////////////////////////////
+    int *rmt; 
 
     /////////////////////////////////////////////////////////////////////
     // Structure 2: Architectural Map Table
     // Entry contains: physical register mapping
     /////////////////////////////////////////////////////////////////////
+    int *amt;
 
     /////////////////////////////////////////////////////////////////////
     // Structure 3: Free List
@@ -24,6 +26,18 @@ private:
     // Notes:
     // * Structure includes head, tail, and their phase bits.
     /////////////////////////////////////////////////////////////////////
+    typedef struct free_list_t{
+        int head, head_phase;
+        int tail, tail_phase;
+        int *list; //array, could be vector as well
+    } free_list;
+    /* How to use:
+        free_list fl; 
+        fl.head = 0;
+        fl.list = new int[free_list_size];  //user input free_list_size
+        fl.head = 0; 
+        fl.list[1] = 20; 
+    */
 
     /////////////////////////////////////////////////////////////////////
     // Structure 4: Active List
@@ -63,6 +77,31 @@ private:
     // Notes:
     // * Structure includes head, tail, and their phase bits.
     /////////////////////////////////////////////////////////////////////
+    typedef struct al_entry_t{
+        unsigned       has_dest;
+        unsigned        logical;
+        unsigned       physical;
+        unsigned      completed;
+        unsigned      exception;
+        unsigned load_violation;
+        unsigned  br_mispredict;
+        unsigned val_mispredict;
+        unsigned        is_load;
+        unsigned       is_store;
+        unsigned      is_branch;
+        unsigned         is_amo;
+        unsigned         is_csr;
+        unsigned             pc;
+    } al_entry;
+
+    typedef struct active_list_t {
+        int head, head_phase;
+        int tail, tail_phase;
+        al_entry_t *list;
+    }active_list;
+    //TODO: verify this works
+    active_list al;
+
 
     /////////////////////////////////////////////////////////////////////
     // Structure 5: Physical Register File
@@ -72,11 +111,13 @@ private:
     // * The value must be of the following type: uint64_t
     //   (#include <inttypes.h>, already at top of this file)
     /////////////////////////////////////////////////////////////////////
+    uint64_t *prf;
 
     /////////////////////////////////////////////////////////////////////
     // Structure 6: Physical Register File Ready Bit Array
     // Entry contains: ready bit
     /////////////////////////////////////////////////////////////////////
+    uint64_t *prf_ready;
 
     /////////////////////////////////////////////////////////////////////
     // Structure 7: Global Branch Mask (GBM)
