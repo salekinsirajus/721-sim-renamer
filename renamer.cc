@@ -194,3 +194,13 @@ bool renamer::get_exception(uint64_t AL_index){
     //TODO: throw exception if AL_index is invalid
     return this->al.list[AL_index].exception; 
 }
+
+bool renamer::active_list_is_empty(){
+    if ((this->al.head == this->al.tail) && 
+        (this->al.head_phase == this->al.tail_phase)){
+
+        return true;
+    }
+
+    return false;
+}

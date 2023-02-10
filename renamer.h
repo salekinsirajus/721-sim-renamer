@@ -544,4 +544,6 @@ public:
     // Helper functions later implemented  .//
     //////////////////////////////////////////
     int get_free_reg_count(free_list_t *free_list, int free_list_size);
+    bool active_list_is_empty();
+    bool free_list_is_empty();
 };
