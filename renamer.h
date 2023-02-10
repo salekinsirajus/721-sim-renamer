@@ -1,4 +1,6 @@
 #include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 class renamer {
 private:
@@ -25,6 +27,10 @@ private:
     //
     // Notes:
     // * Structure includes head, tail, and their phase bits.
+    //
+    // Usage:
+    //  - free entry is at the head, move head pointer at rename
+    //  - add newly freed entry at the tail, move tail pointer at retire
     /////////////////////////////////////////////////////////////////////
     typedef struct free_list_t{
         int head, head_phase;

@@ -76,6 +76,31 @@ bool renamer::stall_reg(uint64_t bundle_dst){
     return true;
 }
 
+uint64_t renamer::rename_rdst(uint64_t log_reg){
+    //phys. dest. reg. = pop new mapping from free list
+    //RMT[logical dest. reg.] = phys. dest. reg.
+
+    uint64_t result;
+    if (this->get_free_reg_count(&this->fl, this->free_list_size) > 0){
+        //read out the content of head of free list
+        result = this->fl.list[this->fl.head];
+        //increase head pointer of free list
+        this->fl.head++;
+        if (this->fl.head == this->free_list_size){
+            //wrap around
+            this->fl.head = 0;
+            this->fl.head_phase = !this->fl.head_phase;
+        }
+        //update RMT
+        this->rmt[log_reg] = result; 
+    } else {
+        printf("FATAL ERROR: rename_rdst - not enough free list entry\n");
+        exit(EXIT_FAILURE);
+    }
+   
+    return result; 
+}
+
 bool renamer::is_ready(uint64_t phys_reg){
     //TODO: check validity of the input
     //TODO: is this phys_reg 0 or 1 indexed?
