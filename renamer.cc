@@ -1,4 +1,5 @@
 #include "renamer.h"
+#include <cassert>
 
 renamer::renamer(uint64_t n_log_regs,
         uint64_t n_phys_regs,
@@ -221,6 +222,34 @@ bool renamer::stall_branch(uint64_t bundle_branch){
 
     return true;
 } 
+
+bool renamer::precommit(bool &completed,
+                        bool &exception, bool &load_viol, bool &br_misp,
+                        bool &val_misp, bool &load, bool &store,
+                        bool &branch, bool &amo, bool &csr,
+                        uint64_t &PC){
+    if (this->active_list_is_empty()){
+        return false; 
+    }
+
+    //set the flags
+    al_entry_t *head;
+    head = &this->al.list[this->al.head];
+
+    completed = head->completed; 
+    exception = head->exception;
+    load_viol = head->load_violation;
+    br_misp   = head->br_mispredict;
+    val_misp  = head->val_mispredict;
+    load      = head->is_load;
+    store     = head->is_store;
+    branch    = head->is_branch;
+    amo       = head->is_amo;
+    csr       = head->is_csr;
+    PC        = head->pc;
+
+    return true;
+}
 
 void renamer::commit(){
     //assertion: active list not empty
