@@ -1,5 +1,4 @@
 #include "renamer.h"
-#include <stdexcept>
 
 renamer::renamer(uint64_t n_log_regs,
         uint64_t n_phys_regs,
@@ -34,12 +33,16 @@ renamer::renamer(uint64_t n_log_regs,
     fl.tail = 0;
     fl.head_phase = 0;
     fl.tail_phase = 0;
+    //What should be the content of the free list?
     for (i=0; i <free_list_size; i++){
         fl.list[i] = 0;
     }
 }
 
-int renamer::free_registers(free_list_t *free_list, int free_list_size){
+int renamer::get_free_reg_count(free_list_t *free_list, int free_list_size){
+    //TODO: MAKE SURE THIS IS WORKING
+    //FIXME: double check the case when tail is increamented while the list
+    //       is empty
     //case 1: head and tail are at the same location
     if (free_list->head == free_list->tail){
         if (free_list->head_phase != free_list->tail_phase){
@@ -51,8 +54,12 @@ int renamer::free_registers(free_list_t *free_list, int free_list_size){
     //case 2: head and tail are at different locations
     //between H and T: free regs (adjust based on the rotations)
     //between T and H: occupied in the AL
-    //TODO: WIP
+    int diff = free_list->tail - free_list->head;
+    if (diff < 0){
+        diff += free_list_size;
+    }
     
+    return diff;
 }
 
 bool renamer::stall_reg(uint64_t bundle_dst){
@@ -61,7 +68,7 @@ bool renamer::stall_reg(uint64_t bundle_dst){
     //if the number of available registers are less than
     //the input return false, otherwise return true
 
-    int available_physical_regs = free_registers(&this->fl, this->free_list_size);
+    int available_physical_regs = this->get_free_reg_count(&this->fl, this->free_list_size);
     if (available_physical_regs < bundle_dst){
         return false;
     }
