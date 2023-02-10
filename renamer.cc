@@ -76,6 +76,13 @@ bool renamer::stall_reg(uint64_t bundle_dst){
     return true;
 }
 
+
+uint64_t renamer::rename_rsrc(uint64_t log_reg){
+    //read off of RMT. This provides the current mapping
+    //TODO: double check this is how the src reg renaming works
+    return this->rmt[log_reg]; 
+}
+
 uint64_t renamer::rename_rdst(uint64_t log_reg){
     //phys. dest. reg. = pop new mapping from free list
     //RMT[logical dest. reg.] = phys. dest. reg.
