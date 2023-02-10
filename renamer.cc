@@ -14,6 +14,7 @@ renamer::renamer(uint64_t n_log_regs,
     prf_ready = new uint64_t[n_phys_regs];
 
     //active list
+    active_list_size = n_active;
     al.list = new al_entry[n_active]; 
     al.head = 0;
     al.tail = 0;
@@ -106,6 +107,61 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
     }
    
     return result; 
+}
+
+
+uint64_t renamer::dispatch_inst(bool dest_valid,
+                           uint64_t log_reg,
+                           uint64_t phys_reg,
+                           bool load,
+                           bool store,
+                           bool branch,
+                           bool amo,
+                           bool csr,
+                           uint64_t PC){
+    /* Mechanism: Reserve entry at tail, write the instruction's logical
+      and physical destination register specifiers, increment tail pointer
+    */
+    if (this->stall_dispatch(1)){
+        //well HOW DO YOU ACTUALLY STALL DISPATCH??
+        //FIXME: the following is wrong, used as a placeholder
+        exit(EXIT_FAILURE);
+    }
+
+    //make a new active list entry
+    al_entry_t *active_list_entry;
+    active_list_entry = &this->al.list[this->al.tail];
+    active_list_entry->has_dest = dest_valid;
+    active_list_entry->logical = (dest_valid) ? log_reg: 0;
+    active_list_entry->physical = (dest_valid) ? phys_reg: 0;
+    active_list_entry->is_load = load;
+    active_list_entry->is_store = store;
+    active_list_entry->is_branch = branch;
+    active_list_entry->is_amo = amo;
+    active_list_entry->is_csr = csr;
+    active_list_entry->pc = PC;
+    //saving the index to return at the end of the function
+    uint64_t idx_at_al = this->al.tail; 
+
+    this->al.tail++;
+    //wrap around of al.tail is at the size of AL
+    if (this->al.tail == this->active_list_size){
+        this->al.tail = 0;
+        this->al.tail_phase = !this->al.tail_phase;
+    }
+
+    return idx_at_al;
+}
+
+bool renamer::stall_dispatch(uint64_t bundle_dst){
+    //Assert Active List is not full
+    if ((this->al.head == this->al.tail) && 
+        (this->al.head_phase != this->al.tail_phase)){
+        //Active List is full, call stall_dispatch 
+        return true;
+    }
+   
+    //WIP: find how many entries are available in the Active List  
 }
 
 bool renamer::is_ready(uint64_t phys_reg){

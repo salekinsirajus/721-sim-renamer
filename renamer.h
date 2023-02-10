@@ -99,7 +99,7 @@ private:
         unsigned      is_branch;
         unsigned         is_amo;
         unsigned         is_csr;
-        unsigned             pc;
+        uint64_t             pc;
     } al_entry;
 
     typedef struct active_list_t {
@@ -109,6 +109,7 @@ private:
     }active_list;
     //TODO: verify this works
     active_list al;
+    int active_list_size;
 
 
     /////////////////////////////////////////////////////////////////////
