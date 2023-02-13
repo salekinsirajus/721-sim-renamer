@@ -232,6 +232,11 @@ bool renamer::stall_dispatch(uint64_t bundle_dst){
     }
    
     //WIP: find how many entries are available in the Active List  
+    if (this->get_free_al_entry_count(this->active_list_size) < bundle_dst){
+        return true;
+    }
+
+    return false;
 }
 
 bool renamer::is_ready(uint64_t phys_reg){
@@ -391,6 +396,18 @@ void renamer::set_value_misprediction(uint64_t AL_index){
 bool renamer::get_exception(uint64_t AL_index){
     //TODO: throw exception if AL_index is invalid
     return this->al.list[AL_index].exception; 
+}
+
+int renamer::get_free_al_entry_count(int active_list_size){
+    if (active_list_size) return active_list_size;
+    
+    //TODO/FIXME: this seems kinda whack, double check
+    int diff = this->al.tail - this->al.head;
+    if (diff < 0){
+        diff += active_list_size;
+    }
+
+    return diff;
 }
 
 bool renamer::active_list_is_empty(){
