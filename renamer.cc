@@ -120,6 +120,7 @@ int renamer::allocate_gbm_bit(){
     //      are zero, it will return i
     //TODO: is this the right approach for resolving?
     uint64_t gbm = this->GBM;
+    if (gbm == UINT64_MAX) return -1;
     
     int i, n = sizeof(this->GBM) * 8;
     uint64_t mask = 1;
@@ -134,6 +135,16 @@ int renamer::allocate_gbm_bit(){
 
     return -1; //No free bit found
 }
+
+uint64_t renamer::get_branch_mask(){
+    //    An instruction's initial branch mask is the value of the
+    //    the GBM when the instruction is renamed.
+    //FIXME: is it always suppossed to return the GBM or sth else based on
+    //    where the instruction is
+    
+    return this->GBM;
+}
+
 
 uint64_t renamer::checkpoint(){
     //create a new branch checkpoint
@@ -155,10 +166,18 @@ uint64_t renamer::checkpoint(){
     temp.gbm = this->GBM;
 
     //FIXME: is this where the new checkpoint should go?
-    //FIXME: WIP
-    this->checkpoints[0] = temp;
+    uint64_t gbm_bit = this->allocate_gbm_bit();
+    if ((gbm_bit < 0) | (gbm_bit > 63)){
+        printf("This should not happen. Could not allocate checkpoint, should stall\n");
+        exit(1);
+    }
+
+    this->checkpoints[gbm_bit] = temp;
+    //mark this position taken at the GBM
+    this->GBM |= (1ULL<<gbm_bit);
 
     //  4. Checkpointed GBM
+    return gbm_bit;
 }
 
 uint64_t renamer::dispatch_inst(bool dest_valid,
@@ -340,11 +359,11 @@ void renamer::commit(){
 }
 
 void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
-    
+    //FIXME: Not implemented 
 }
 
 void renamer::squash(){
-    //TODO: Not Implemented
+    //FIXME: Not Implemented
     //What does squashing entail?
     //zero out all the instructions in AL? or put the HEAD and TAIL together?
     //copy AMT to RMT
