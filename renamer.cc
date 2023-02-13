@@ -116,23 +116,23 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
 }
 
 int renamer::allocate_gbm_bit(){
-    if (this->GBM == UINT64_MAX){
-        return -1; //not available
-    }
-
-    //iterate until you find an empty one
+    //NOTE: Allocate free bit from left to right, so if i<j and both of bits
+    //      are zero, it will return i
+    //TODO: is this the right approach for resolving?
     uint64_t gbm = this->GBM;
-    int i=0;
-    while (i < sizeof(uint64_t) * 8){
-        if (gbm & 0 == 0){
-            //found an empty bit
+    
+    int i, n = sizeof(this->GBM) * 8;
+    uint64_t mask = 1;
+
+    for (i=0; i < n; i++){
+        if (gbm & mask){
+            mask <<= 1;
+        } else {
             return i;
         }
-        gbm =>> 1;
-        i++
     }
 
-    return -1;
+    return -1; //No free bit found
 }
 
 uint64_t renamer::checkpoint(){
@@ -155,7 +155,8 @@ uint64_t renamer::checkpoint(){
     temp.gbm = this->GBM;
 
     //FIXME: is this where the new checkpoint should go?
-    this->checkpoints.push_back(temp);
+    //FIXME: WIP
+    this->checkpoints[0] = temp;
 
     //  4. Checkpointed GBM
 }

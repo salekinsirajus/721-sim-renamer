@@ -184,7 +184,7 @@ private:
 
     int shadow_map_table_size;
 
-    std::vector<cp>checkpoints;
+    cp checkpoints[sizeof(uint64_t)*8];
 
     /////////////////////////////////////////////////////////////////////
     // Private functions.
