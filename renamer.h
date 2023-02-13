@@ -175,11 +175,22 @@ private:
     // 2. checkpointed Free List head pointer and its phase bit
     // 3. checkpointed GBM
     /////////////////////////////////////////////////////////////////////
+    typedef struct checkpoint_t{
+        int *shadow_map_table; 
+        int free_list_head;
+        int free_list_head_phase;
+        int gbm;
+    }cp;
+
+    int shadow_map_table_size;
+
+    std::vector<cp>checkpoints;
 
     /////////////////////////////////////////////////////////////////////
     // Private functions.
     // e.g., a generic function to copy state from one map to another.
     /////////////////////////////////////////////////////////////////////
+    int allocate_gbm_bit();
 
 public:
     ////////////////////////////////////////
@@ -189,7 +200,7 @@ public:
     /////////////////////////////////////////////////////////////////////
     // This is the constructor function.
     // When a renamer object is instantiated, the caller indicates:
-    // 1. The number of logical registers (e.g., 32).
+        // 1. The number of logical registers (e.g., 32).
     // 2. The number of physical registers (e.g., 128).
     // 3. The maximum number of unresolved branches.
     //    Requirement: 1 <= n_branches <= 64.

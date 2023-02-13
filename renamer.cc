@@ -13,6 +13,7 @@ renamer::renamer(uint64_t n_log_regs,
     amt = new int[n_log_regs];
     prf = new uint64_t[n_phys_regs];
     prf_ready = new uint64_t[n_phys_regs];
+    shadow_map_table_size = n_log_regs;
 
     //active list
     active_list_size = n_active;
@@ -39,6 +40,10 @@ renamer::renamer(uint64_t n_log_regs,
     for (i=0; i <free_list_size; i++){
         fl.list[i] = 0;
     }
+
+    //checkpoint stuff
+    //how many different checkpoint entrys? 
+    //should we keep this in a container?   
 }
 
 int renamer::get_free_reg_count(free_list_t *free_list, int free_list_size){
@@ -110,6 +115,50 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
     return result; 
 }
 
+int renamer::allocate_gbm_bit(){
+    if (this->GBM == UINT64_MAX){
+        return -1; //not available
+    }
+
+    //iterate until you find an empty one
+    uint64_t gbm = this->GBM;
+    int i=0;
+    while (i < sizeof(uint64_t) * 8){
+        if (gbm & 0 == 0){
+            //found an empty bit
+            return i;
+        }
+        gbm =>> 1;
+        i++
+    }
+
+    return -1;
+}
+
+uint64_t renamer::checkpoint(){
+    //create a new branch checkpoint
+    //allocate:
+    //  1. GMB bit: starting from left or right? which way does this move? 
+    // 
+
+    //  2. Shadow Map Table (checkpointed RMT)
+    cp temp;
+    // SMT: copying over the AMT content
+    temp.shadow_map_table = new int[this->shadow_map_table_size];
+    int i;
+    for (i=0; i<this->shadow_map_table_size; i++){
+        temp.shadow_map_table[i] = this->amt[i];
+    }
+    // SMT: head and head phase
+    temp.free_list_head = this->fl.head;
+    temp.free_list_head_phase = this->fl.head_phase;
+    temp.gbm = this->GBM;
+
+    //FIXME: is this where the new checkpoint should go?
+    this->checkpoints.push_back(temp);
+
+    //  4. Checkpointed GBM
+}
 
 uint64_t renamer::dispatch_inst(bool dest_valid,
                            uint64_t log_reg,
@@ -287,6 +336,10 @@ void renamer::commit(){
     }
     
     return;
+}
+
+void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
+    
 }
 
 void renamer::squash(){
