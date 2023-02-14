@@ -194,6 +194,7 @@ private:
     // e.g., a generic function to copy state from one map to another.
     /////////////////////////////////////////////////////////////////////
     int allocate_gbm_bit();
+    void init_al_entry(al_entry_t *ale);
 
 public:
     ////////////////////////////////////////

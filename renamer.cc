@@ -31,7 +31,7 @@ renamer::renamer(uint64_t n_log_regs,
     al.tail_phase = 0;    
     //TODO: initiate all fields to 0 in the active list entry
     for (i=0; i<n_active; i++){
-        al.list[i] = {};
+        init_al_entry(&al.list[i]);
     }
     
     //free list
@@ -460,4 +460,22 @@ bool renamer::active_list_is_empty(){
     }
 
     return false;
+}
+
+void renamer::init_al_entry(al_entry_t *ale){
+    //initiate all fields to 0 
+    ale->has_dest=0;
+    ale->logical=0;
+    ale->physical=0;
+    ale->completed=0;
+    ale->exception=0;
+    ale->load_violation=0;
+    ale->br_mispredict=0;
+    ale->val_mispredict=0;
+    ale->is_load=0;
+    ale->is_store=0;
+    ale->is_branch=0;
+    ale->is_amo=0;
+    ale->is_csr=0;
+    ale->pc=0;
 }
