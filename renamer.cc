@@ -78,10 +78,10 @@ bool renamer::stall_reg(uint64_t bundle_dst){
 
     int available_physical_regs = this->get_free_reg_count(&this->fl, this->free_list_size);
     if (available_physical_regs < bundle_dst){
-        return false;
+        return true;
     }
     
-    return true;
+    return false;
 }
 
 
@@ -291,7 +291,7 @@ bool renamer::stall_branch(uint64_t bundle_branch){
         }
     }
 
-    if (sizeof(this->GBM) - one_bit_counter < bundle_branch){
+    if ((sizeof(this->GBM) * 8) - one_bit_counter < bundle_branch){
         return false;
     }
 
