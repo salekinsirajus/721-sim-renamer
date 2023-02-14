@@ -281,7 +281,7 @@ bool renamer::stall_branch(uint64_t bundle_branch){
     //TODO: IS THIS THE RIGHT ALGORITHM?
     //if the number of zero's in GBM is less than bundle_branch return true
     //return false otherwise TODO: is there multiple value of GBM
-    int one_bit_counter;
+    int one_bit_counter = 0;
     int gbm_copy = this->GBM;
 
     while (gbm_copy){
