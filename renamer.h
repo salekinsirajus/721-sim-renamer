@@ -181,11 +181,13 @@ private:
         int free_list_head;
         int free_list_head_phase;
         int gbm;
+        bool __in_use;  //secret variable
     }cp;
 
     int shadow_map_table_size;
+    int num_checkpoints;
 
-    cp checkpoints[sizeof(uint64_t)*8];
+    checkpoint_t *checkpoints;
 
     /////////////////////////////////////////////////////////////////////
     // Private functions.

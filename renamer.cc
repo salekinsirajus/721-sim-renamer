@@ -45,6 +45,8 @@ renamer::renamer(uint64_t n_log_regs,
     //checkpoint stuff
     //how many different checkpoint entrys? 
     //should we keep this in a container?   
+    num_checkpoints = sizeof(uint64_t)*8;
+    checkpoints = new checkpoint_t[num_checkpoints];
 }
 
 int renamer::get_free_reg_count(free_list_t *free_list, int free_list_size){
@@ -164,6 +166,7 @@ uint64_t renamer::checkpoint(){
     // SMT: head and head phase
     temp.free_list_head = this->fl.head;
     temp.free_list_head_phase = this->fl.head_phase;
+    temp.__in_use = true;
     temp.gbm = this->GBM;
 
     //FIXME: is this where the new checkpoint should go?
@@ -365,8 +368,21 @@ void renamer::commit(){
 }
 
 void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
-    //FIXME: Not implemented 
-    printf("resolve gets called. Not Implemented\n");
+    if (correct){ //branch was predicted correctly
+        //clear the GBM bit by indexing with branch_ID
+        this->GBM  |= (1ULL<<branch_ID);
+        //clear all the checkpointed GBMs;
+        int i;
+        for (i=0; i < this->num_checkpoints; i++){
+            this->checkpoints[i].gbm |= (1ULL << branch_ID);
+        } 
+        //TODO: (verify) resetting the in_use to false
+        this->checkpoints[branch_ID].__in_use = false; 
+
+    } else {
+        //FIXME: Not Implemented
+        printf("resolve():: Branch Mispredict recovery Not Implemented\n");
+    }
 }
 
 void renamer::squash(){
