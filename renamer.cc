@@ -9,6 +9,7 @@ renamer::renamer(uint64_t n_log_regs,
     //sanitize inputs TODO
   
     //initialize the data structures
+    map_table_size = n_log_regs;
     rmt = new int[n_log_regs]; 
     amt = new int[n_log_regs];
     prf = new uint64_t[n_phys_regs];
@@ -365,14 +366,28 @@ void renamer::commit(){
 
 void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
     //FIXME: Not implemented 
+    printf("resolve gets called. Not Implemented\n");
 }
 
 void renamer::squash(){
     //FIXME: Not Implemented
     //What does squashing entail?
-    //zero out all the instructions in AL? or put the HEAD and TAIL together?
+    //zero out all the instructions in AL. AL tail = head
+    this->al.head = this->al.tail;
+    this->al.head_phase = this->al.head_phase;
+    
+    //restore free list    
+    this->fl.head = this->fl.tail;
+    this->fl.head_phase = !this->fl.tail_phase;
+
     //copy AMT to RMT
+    int i;
+    for (i=0; i < this->map_table_size; i++){
+        rmt[i] = amt[i];
+    }
+    
     //What else is involved in squashing a renamer with AMT+RMT?
+    printf("squash gets called. Not Implemented\n");
     
     return;
 }
