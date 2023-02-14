@@ -16,6 +16,12 @@ renamer::renamer(uint64_t n_log_regs,
     prf_ready = new uint64_t[n_phys_regs];
     shadow_map_table_size = n_log_regs;
 
+    int i;
+    //setting the ready bits to 1 (meaning no pending registers)
+    for (i=0; i < n_phys_regs; i++){
+        prf_ready[i] = 1;
+    }
+
     //active list
     active_list_size = n_active;
     al.list = new al_entry[n_active]; 
@@ -23,7 +29,6 @@ renamer::renamer(uint64_t n_log_regs,
     al.tail = 0;
     al.head_phase = 0;
     al.tail_phase = 0;    
-    int i;
     //TODO: initiate all fields to 0 in the active list entry
     for (i=0; i<n_active; i++){
         al.list[i] = {};
