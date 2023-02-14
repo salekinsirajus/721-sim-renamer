@@ -6,7 +6,11 @@ renamer::renamer(uint64_t n_log_regs,
         uint64_t n_branches,
         uint64_t n_active){
     
-    //sanitize inputs TODO
+    //Run the assertions
+    assert(n_phys_regs > n_log_regs);
+    //TODO: fix the machinary that sets the number of checkpoints to be flexible
+    assert((1 <= n_branches) && (n_branches <= 64));
+    assert(n_active > 0);
   
     //initialize the data structures
     map_table_size = n_log_regs;
@@ -50,8 +54,10 @@ renamer::renamer(uint64_t n_log_regs,
     //checkpoint stuff
     //how many different checkpoint entrys? 
     //should we keep this in a container?   
+    GBM = 0;
     num_checkpoints = sizeof(uint64_t)*8;
     checkpoints = new checkpoint_t[num_checkpoints];
+
 }
 
 int renamer::get_free_reg_count(free_list_t *free_list, int free_list_size){
