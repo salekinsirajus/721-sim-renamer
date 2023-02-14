@@ -515,6 +515,9 @@ bool renamer::retire_from_active_list(){
         this->al.head_phase = !this->al.head_phase;
     }
 
+    printf("printing active list after increamenting the head pointer\n");
+    this->print_active_list(true);
+    
     return true;
 }
 
