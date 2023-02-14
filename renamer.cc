@@ -14,6 +14,7 @@ renamer::renamer(uint64_t n_log_regs,
   
     //initialize the data structures
     map_table_size = n_log_regs;
+    num_phys_reg = n_phys_regs;
     rmt = new int[n_log_regs]; 
     amt = new int[n_log_regs];
     prf = new uint64_t[n_phys_regs];
