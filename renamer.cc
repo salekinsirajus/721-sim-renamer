@@ -33,7 +33,7 @@ renamer::renamer(uint64_t n_log_regs,
     al.tail = 0;
     al.head_phase = 0;
     al.tail_phase = 0;    
-    //TODO: initiate all fields to 0 in the active list entry
+
     for (i=0; i<n_active; i++){
         init_al_entry(&al.list[i]);
     }
@@ -46,9 +46,10 @@ renamer::renamer(uint64_t n_log_regs,
     fl.tail = 0;
     fl.head_phase = 0;
     fl.tail_phase = 0;
-    //What should be the content of the free list?
+
+    //FIXME: (potential issues) What should be the content of the free list?
     for (i=0; i <free_list_size; i++){
-        fl.list[i] = 0;
+        fl.list[i] = i; //these should be unique values
     }
 
     //checkpoint stuff
