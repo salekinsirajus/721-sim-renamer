@@ -227,6 +227,7 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
     active_list_entry->has_dest = dest_valid;
     active_list_entry->logical = (dest_valid) ? log_reg: 0;
     active_list_entry->physical = (dest_valid) ? phys_reg: 0;
+    active_list_entry->completed = 0; //just dispatched
     active_list_entry->is_load = load;
     active_list_entry->is_store = store;
     active_list_entry->is_branch = branch;
