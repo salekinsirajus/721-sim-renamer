@@ -300,10 +300,10 @@ bool renamer::stall_branch(uint64_t bundle_branch){
     }
 
     if ((sizeof(this->GBM) * 8) - one_bit_counter < bundle_branch){
-        return false;
+        return true;
     }
 
-    return true;
+    return false;
 } 
 
 bool renamer::precommit(bool &completed,
