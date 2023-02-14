@@ -24,6 +24,13 @@ renamer::renamer(uint64_t n_log_regs,
     //setting the ready bits to 1 (meaning no pending registers)
     for (i=0; i < n_phys_regs; i++){
         prf_ready[i] = 1;
+        //AMT and RMT should have the same value at the beginning
+        //However, not sure what would the content be. if amt[0] = 0, amt[1] = 0
+        //then all the logical registers are mapped to p0. OTOH, amt[0] = 0 and
+        //amt[1] = 1,..., amt[n] = n indicate r0->p0, r1->p1,..
+        //the contents of the prf does not matter I suppose.
+        amt[i] = i;
+        rmt[i] = i;
     }
 
     //active list
