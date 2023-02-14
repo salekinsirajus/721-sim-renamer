@@ -573,4 +573,8 @@ public:
     uint64_t pop_free_list();
     int free_list_regs_available();
     void restore_free_list();
+    void print_free_list();
+    void print_amt();
+    void print_rmt();
+    void print_active_list(bool between_head_and_tail);
 };

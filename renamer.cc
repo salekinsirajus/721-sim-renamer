@@ -382,14 +382,20 @@ void renamer::write(uint64_t phys_reg, uint64_t value){
 }
 
 void renamer::set_complete(uint64_t AL_index){
+    printf("renamer::set_complete() is called\n");
+ 
     //TODO: check validity of the input
     this->al.list[AL_index].completed = 1; 
+    this->print_active_list(true);
+    this->print_rmt();
+    this->print_amt();
 }
 
 bool renamer::stall_branch(uint64_t bundle_branch){
     //TODO: IS THIS THE RIGHT ALGORITHM?
     //if the number of zero's in GBM is less than bundle_branch return true
     //return false otherwise TODO: is there multiple value of GBM
+    printf("renamer::stall_branch() is called\n");
     int one_bit_counter = 0;
     int gbm_copy = this->GBM;
 
@@ -412,7 +418,12 @@ bool renamer::precommit(bool &completed,
                         bool &val_misp, bool &load, bool &store,
                         bool &branch, bool &amo, bool &csr,
                         uint64_t &PC){
+
+    printf("renamer::precommit() is called\n");
+
     if (this->active_list_is_empty()){
+        this->print_active_list(true);
+        printf("renamer::precommit() - active list is empty.\n");
         return false; 
     }
 
@@ -442,6 +453,7 @@ bool renamer::precommit(bool &completed,
 }
 
 void renamer::commit(){
+    printf("renamer::commit() is called\n");
     //assertion: active list not empty
     assert(!this->active_list_is_empty());     
     al_entry_t *al_head;
@@ -492,7 +504,10 @@ bool renamer::retire_from_active_list(){
         return false;
     }
 
-    //increase head pointer of free list
+    //TODO: updating other structures like AMT, RMT, Free list, Shadow Map Table?
+    //advance head pointer of the Active List
+    printf("printing active list before increamenting the head pointer\n");
+    this->print_active_list(true);
     this->al.head++;
     if (this->al.head == this->active_list_size){
         //wrap around
@@ -504,6 +519,7 @@ bool renamer::retire_from_active_list(){
 }
 
 void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
+    printf("renamer::resolve() is called\n");
     if (correct){ //branch was predicted correctly
         //clear the GBM bit by indexing with branch_ID
         this->GBM  |= (1ULL<<branch_ID);
@@ -526,6 +542,8 @@ void renamer::squash(){
     //FIXME: Not Implemented
     //What does squashing entail?
     //zero out all the instructions in AL. AL tail = head
+    printf("renamer::squash is called\n");
+    //empty out the active list
     this->al.head = this->al.tail;
     this->al.head_phase = this->al.tail_phase;
     
@@ -610,6 +628,24 @@ bool renamer::active_list_is_empty(){
     return false;
 }
 
+void renamer::print_active_list(bool between_head_and_tail){
+    int i=0, n=active_list_size;
+    if (between_head_and_tail) {
+        i = this->al.head;
+        n = this->al.tail;
+    }
+    printf("| idx | log| phys | com | exc |\n");
+    for (i; i < n; i++){
+        al_entry_t *t;
+        t = &this->al.list[i];
+        printf("| %d | %d | %d | %d | %d |\n", i, t->logical, t->physical, t->completed, t->exception);   
+    }
+    printf("AL Head: %d, AL tail: %d, Head Phase: %d, Tail Phase: %d\n",
+            this->al.head, this->al.tail, this->al.head_phase, this->al.tail_phase
+        );
+
+}
+
 void renamer::init_al_entry(al_entry_t *ale){
     //WIP: fix the type
     //initiate all fields to 0 
@@ -627,4 +663,22 @@ void renamer::init_al_entry(al_entry_t *ale){
     ale->is_amo=0;
     ale->is_csr=0;
     ale->pc=0;
+}
+
+//Debugging helper functions
+void renamer::print_free_list(){}
+void renamer::print_amt(){
+    printf("---------------------AMT-----------------\n");
+    for (int i=0; i < this->map_table_size; i++){
+        printf("| %d ", amt[i]);
+    }
+    printf("\n-------------------END_AMT-----------------\n");
+}
+void renamer::print_rmt(){
+    printf("---------------------RMT-----------------\n");
+    for (int i=0; i < this->map_table_size; i++){
+        printf("| %d ", rmt[i]);
+    }
+    printf("\n-------------------END_RMT-----------------\n");
+
 }
