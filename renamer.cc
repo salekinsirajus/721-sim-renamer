@@ -236,12 +236,13 @@ bool renamer::stall_dispatch(uint64_t bundle_dst){
     //Assert Active List is not full
     if ((this->al.head == this->al.tail) && 
         (this->al.head_phase != this->al.tail_phase)){
-        //Active List is full, call stall_dispatch 
+        printf("Active List is full, call stall_dispatch\n");
         return true;
     }
    
     //WIP: find how many entries are available in the Active List  
     if (this->get_free_al_entry_count(this->active_list_size) < bundle_dst){
+        printf("Number of free entries are less than what's needed\n");
         return true;
     }
 
@@ -275,9 +276,14 @@ uint64_t renamer::read(uint64_t phys_reg){
 void renamer::write(uint64_t phys_reg, uint64_t value){
     //TODO: check validity of the input
     //TODO: is this phys_reg 0 or 1 indexed?
+    printf("----------------------Start---------------------------\n");
+    printf("renamer::write(), bwfore write: %d\n", this->prf[phys_reg]);
+    printf("renamer::write(), reg: %d, val: %d\n", phys_reg, value);
     this->prf[phys_reg] = value; 
     //TODO: does this involve ALSO setting the ready bit?
     //TODO: look into this more
+    printf("renamer::write(), after write: %d\n", this->prf[phys_reg]);
+    printf("----------------------end---------------------------\n");
 }
 
 void renamer::set_complete(uint64_t AL_index){
