@@ -370,9 +370,9 @@ void renamer::commit(){
     //advance head pointer of the Active List
     this->al.head++;
     //FIXME: do we wrap the active list the same way we do freelist?
-    if (this->al.tail == this->active_list_size){
-        this->al.tail = 0;
-        this->al.tail_phase = !this->al.head_phase;
+    if (this->al.head == this->active_list_size){
+        this->al.head = 0;
+        this->al.head_phase = !this->al.head_phase;
     }
     
     return;
@@ -401,7 +401,7 @@ void renamer::squash(){
     //What does squashing entail?
     //zero out all the instructions in AL. AL tail = head
     this->al.head = this->al.tail;
-    this->al.head_phase = this->al.head_phase;
+    this->al.head_phase = this->al.tail_phase;
     
     //restore free list    
     this->fl.head = this->fl.tail;
