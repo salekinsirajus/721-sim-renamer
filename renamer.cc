@@ -108,9 +108,11 @@ bool renamer::stall_reg(uint64_t bundle_dst){
     }
 
     if (available_physical_regs < bundle_dst){
+        printf("renamer::stall_reg() return true\n");
         return true;
     }
     
+    printf("renamer::stall_reg() return false\n");
     return false;
 }
 
@@ -118,6 +120,8 @@ bool renamer::stall_reg(uint64_t bundle_dst){
 uint64_t renamer::rename_rsrc(uint64_t log_reg){
     //read off of RMT. This provides the current mapping
     //TODO: double check this is how the src reg renaming works
+    printf("renamer::rename_rsrc(%d) = %d\n", log_reg, this->rmt[log_reg]);
+    printf("renamer::rename_rsrc(%d) = amt[%d], rmt[%d]\n", log_reg, this->amt[log_reg], this->rmt[log_reg]);
     return this->rmt[log_reg]; 
 }
 
@@ -182,9 +186,33 @@ uint64_t renamer::pop_free_list(){
 uint64_t renamer::rename_rdst(uint64_t log_reg){
     //phys. dest. reg. = pop new mapping from free list
     //RMT[logical dest. reg.] = phys. dest. reg.
+    printf("renamer::rename_rdst() called\n");
 
+<<<<<<< HEAD
     uint64_t result = this->pop_free_list();
     if (result == UINT64_MAX){
+=======
+    uint64_t result;
+    if (this->get_free_reg_count(&this->fl, this->free_list_size) > 0){
+        //read out the content of head of free list
+        result = this->fl.list[this->fl.head];
+        //increase head pointer of free list
+        this->fl.head++;
+        if (this->fl.head == this->free_list_size){
+            //wrap around
+            this->fl.head = 0;
+            this->fl.head_phase = !this->fl.head_phase;
+        }
+        //update RMT
+        //printf("RMT+PRF before updating with popped register from the free list\n");
+        //this->print_rmt();
+        //this->print_prf();
+        this->rmt[log_reg] = result; 
+        //printf("RMT+PRF after updating with popped register from the free list\n");
+        //this->print_rmt();
+        //this->print_prf();
+    } else {
+>>>>>>> Added more debugging statements
         printf("FATAL ERROR: rename_rdst - not enough free list entry\n");
         exit(EXIT_FAILURE);
     } else {
@@ -192,6 +220,9 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
         this->rmt[log_reg] = result; 
     }
    
+    //FIXME: what happens to the old mapping?????
+    printf("renamer::rename_rdst(%d) = amt[%d], rmt[%d]\n", log_reg, this->amt[log_reg], this->rmt[log_reg]);
+    printf("renamer::rename_rdst(%d) = %d\n", log_reg, this->rmt[log_reg]);
     return result; 
 }
 
@@ -295,6 +326,7 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
         //FIXME: the following is wrong, used as a placeholder
         exit(EXIT_FAILURE);
     }
+    printf("renamer::dispatch_inst() is called\n");
 
     uint64_t idx_at_al = this->insert_into_active_list(); 
     if (idx_at_al == UINT64_MAX){
@@ -351,44 +383,50 @@ bool renamer::stall_dispatch(uint64_t bundle_dst){
 bool renamer::is_ready(uint64_t phys_reg){
     //TODO: check validity of the input
     //TODO: is this phys_reg 0 or 1 indexed?
+    printf("renamer::is_ready(%d) = %d\n", phys_reg, this->prf_ready[phys_reg]);
     return this->prf_ready[phys_reg];
 }
 
 void renamer::clear_ready(uint64_t phys_reg){
     //TODO: check validity of the input
     //TODO: is this phys_reg 0 or 1 indexed?
+    printf("renamer::clear_ready(%d) = %d (before)\n", phys_reg, this->prf_ready[phys_reg]);
     this->prf_ready[phys_reg] = 0;
+    printf("renamer::clear_ready(%d) = %d (after)\n", phys_reg, this->prf_ready[phys_reg]);
 }
 
 void renamer::set_ready(uint64_t phys_reg){
     //TODO: check validity of the input
     //TODO: is this phys_reg 0 or 1 indexed?
+    printf("renamer::set_ready(%d) = %d (before)\n", phys_reg, this->prf_ready[phys_reg]);
     this->prf_ready[phys_reg] = 1;
+    printf("renamer::set_ready(%d) = %d (after)\n", phys_reg, this->prf_ready[phys_reg]);
 }
 
 uint64_t renamer::read(uint64_t phys_reg){
     //TODO: check validity of the input
     //TODO: is this phys_reg 0 or 1 indexed?
+    printf("renamer::read()   prf[%d]=%d\n", phys_reg, this->prf[phys_reg]);
     return this->prf[phys_reg];
 }
 
 void renamer::write(uint64_t phys_reg, uint64_t value){
     //TODO: check validity of the input
     //TODO: is this phys_reg 0 or 1 indexed?
-    printf("renamer::write(), reg: %d, val: %d\n", phys_reg, value);
+    printf("renamer::write() prf[%d]=%d\n", phys_reg, value);
     this->prf[phys_reg] = value; 
     //TODO: does this involve ALSO setting the ready bit?
     //TODO: look into this more
 }
 
 void renamer::set_complete(uint64_t AL_index){
-    printf("renamer::set_complete() is called\n");
+    printf("renamer::set_complete() AL index: %d\n", AL_index);
  
     //TODO: check validity of the input
     this->al.list[AL_index].completed = 1; 
-    this->print_active_list(true);
-    this->print_rmt();
-    this->print_amt();
+    //this->print_active_list(0);
+    //this->print_rmt();
+    //this->print_amt();
 }
 
 bool renamer::stall_branch(uint64_t bundle_branch){
@@ -422,7 +460,6 @@ bool renamer::precommit(bool &completed,
     printf("renamer::precommit() is called\n");
 
     if (this->active_list_is_empty()){
-        this->print_active_list(true);
         printf("renamer::precommit() - active list is empty.\n");
         return false; 
     }
@@ -506,17 +543,18 @@ bool renamer::retire_from_active_list(){
 
     //TODO: updating other structures like AMT, RMT, Free list, Shadow Map Table?
     //advance head pointer of the Active List
-    printf("printing active list before increamenting the head pointer\n");
-    this->print_active_list(true);
+    ////printf("printing active list before increamenting the head pointer\n");
+    ////this->print_active_list(0);
     this->al.head++;
     if (this->al.head == this->active_list_size){
         //wrap around
         this->al.head = 0;
         this->al.head_phase = !this->al.head_phase;
     }
-
-    printf("printing active list after increamenting the head pointer\n");
-    this->print_active_list(true);
+    ////printf("printing active list after increamenting the head pointer\n");
+    ////this->print_active_list(0);
+    ////this->print_rmt();
+    ////this->print_amt();
     
     return true;
 }
@@ -641,7 +679,7 @@ void renamer::print_active_list(bool between_head_and_tail){
     for (i; i < n; i++){
         al_entry_t *t;
         t = &this->al.list[i];
-        printf("| %d | %d | %d | %d | %d |\n", i, t->logical, t->physical, t->completed, t->exception);   
+        printf("| %3d | %3d | %3d | %3d | %3d |\n", i, t->logical, t->physical, t->completed, t->exception);   
     }
     printf("AL Head: %d, AL tail: %d, Head Phase: %d, Tail Phase: %d\n",
             this->al.head, this->al.tail, this->al.head_phase, this->al.tail_phase
@@ -673,15 +711,23 @@ void renamer::print_free_list(){}
 void renamer::print_amt(){
     printf("---------------------AMT-----------------\n");
     for (int i=0; i < this->map_table_size; i++){
-        printf("| %d ", amt[i]);
+        printf("| %3d ", amt[i]);
     }
     printf("\n-------------------END_AMT-----------------\n");
 }
 void renamer::print_rmt(){
     printf("---------------------RMT-----------------\n");
     for (int i=0; i < this->map_table_size; i++){
-        printf("| %d ", rmt[i]);
+        printf("| %3d ", rmt[i]);
     }
     printf("\n-------------------END_RMT-----------------\n");
+
+}
+void renamer::print_prf(){
+    printf("---------------------PRF-----------------\n");
+    for (int i=0; i < this->num_phys_reg; i++){
+        printf("| %16d ", prf[i]);
+    }
+    printf("\n-------------------END_PRF-----------------\n");
 
 }
