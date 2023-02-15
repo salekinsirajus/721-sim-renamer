@@ -15,8 +15,8 @@ renamer::renamer(uint64_t n_log_regs,
     //initialize the data structures
     map_table_size = n_log_regs;
     num_phys_reg = n_phys_regs;
-    rmt = new int[n_log_regs]; 
-    amt = new int[n_log_regs];
+    rmt = new uint64_t[n_log_regs]; 
+    amt = new uint64_t[n_log_regs];
     prf = new uint64_t[n_phys_regs];
     prf_ready = new uint64_t[n_phys_regs];
     shadow_map_table_size = n_log_regs;
@@ -292,14 +292,10 @@ uint64_t renamer::read(uint64_t phys_reg){
 void renamer::write(uint64_t phys_reg, uint64_t value){
     //TODO: check validity of the input
     //TODO: is this phys_reg 0 or 1 indexed?
-    printf("----------------------Start---------------------------\n");
-    printf("renamer::write(), bwfore write: %d\n", this->prf[phys_reg]);
     printf("renamer::write(), reg: %d, val: %d\n", phys_reg, value);
     this->prf[phys_reg] = value; 
     //TODO: does this involve ALSO setting the ready bit?
     //TODO: look into this more
-    printf("renamer::write(), after write: %d\n", this->prf[phys_reg]);
-    printf("----------------------end---------------------------\n");
 }
 
 void renamer::set_complete(uint64_t AL_index){
