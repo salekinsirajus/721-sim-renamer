@@ -564,5 +564,6 @@ public:
     int get_free_reg_count(free_list_t *free_list, int free_list_size);
     int get_free_al_entry_count(int active_list_size);
     bool active_list_is_empty();
+    bool active_list_is_full();
     bool free_list_is_empty();
 };

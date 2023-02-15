@@ -84,6 +84,7 @@ int renamer::get_free_reg_count(free_list_t *free_list, int free_list_size){
     //case 2: head and tail are at different locations
     //between H and T: free regs (adjust based on the rotations)
     //between T and H: occupied in the AL
+    //FIXME: is this the correct algorithm?
     int diff = free_list->tail - free_list->head;
     if (diff < 0){
         diff += free_list_size;
@@ -221,6 +222,9 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
         //FIXME: the following is wrong, used as a placeholder
         exit(EXIT_FAILURE);
     }
+
+    //assert active list is not full
+    assert(!this->active_list_is_full());
 
     //make a new active list entry
     al_entry_t *active_list_entry;
@@ -469,6 +473,16 @@ int renamer::get_free_al_entry_count(int active_list_size){
     }
 
     return diff;
+}
+
+bool renamer::active_list_is_full(){
+    if ((this->al.head == this->al.tail) && 
+        (this->al.head_phase != this->al.tail_phase)){
+
+        return true;
+    }
+
+    return false;
 }
 
 bool renamer::active_list_is_empty(){
