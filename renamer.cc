@@ -229,6 +229,7 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
     active_list_entry->logical = (dest_valid) ? log_reg: 0;
     active_list_entry->physical = (dest_valid) ? phys_reg: 0;
     active_list_entry->completed = 0; //just dispatched
+    active_list_entry->exception = 0; //just dispatched
     active_list_entry->is_load = load;
     active_list_entry->is_store = store;
     active_list_entry->is_branch = branch;
@@ -368,11 +369,11 @@ void renamer::commit(){
     //find the physical dst register by looking up the AMT with logical reg
     //EXCEPTION: only if the instruction has a valid destination
     if (al_head->has_dest){
-        int to_be_freed = this->amt[al_head->logical];
+        int old_mapping = this->amt[al_head->logical];
         //push the freed reg to the free list
         //  - insert at it the tail
 
-        this->fl.list[this->fl.tail] = to_be_freed;
+        this->fl.list[this->fl.tail] = old_mapping;
         //  - advance tail ptr
         this->fl.tail++;
         if (this->fl.tail == this->free_list_size){
@@ -380,6 +381,9 @@ void renamer::commit(){
             this->fl.tail_phase = !this->fl.head_phase;
         }
     }
+
+    //Update AMT with with new mapping 
+    this->amt[al_head->logical] = al_head->physical;
 
     //TODO: updating other structures like AMT, RMT, Free list, Shadow Map Table?
     //advance head pointer of the Active List
