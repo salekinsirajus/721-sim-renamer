@@ -36,7 +36,7 @@ private:
     typedef struct free_list_t{
         int head, head_phase;
         int tail, tail_phase;
-        int *list; //array, could be vector as well
+        uint64_t *list;
     } free_list;
 
     int free_list_size;    
@@ -561,9 +561,13 @@ public:
     //////////////////////////////////////////
     // Helper functions later implemented  .//
     //////////////////////////////////////////
-    int get_free_reg_count(free_list_t *free_list, int free_list_size);
     int get_free_al_entry_count(int active_list_size);
     bool active_list_is_empty();
     bool active_list_is_full();
+
     bool free_list_is_empty();
+    bool free_list_is_full();
+    bool push_free_list(uint64_t phys_reg);
+    uint64_t pop_free_list();
+    int free_list_regs_available();
 };

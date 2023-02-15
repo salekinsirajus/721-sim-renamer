@@ -49,11 +49,12 @@ renamer::renamer(uint64_t n_log_regs,
     //free list
     //free list size (721ss-prf-2 slide, p19), eq prf - n_log_regs
     free_list_size = n_phys_regs - n_log_regs;
-    fl.list = new int[free_list_size];
+    fl.list = new uint64_t[free_list_size];
     fl.head = 0;
     fl.tail = 0;
     fl.head_phase = 0;
-    fl.tail_phase = 0;
+    fl.tail_phase = 1;
+    assert(this->free_list_is_full()); //free list should be full at init
 
     //FIXME: (potential issues) What should be the content of the free list?
     for (i=0; i <free_list_size; i++){
@@ -69,28 +70,28 @@ renamer::renamer(uint64_t n_log_regs,
 
 }
 
-int renamer::get_free_reg_count(free_list_t *free_list, int free_list_size){
-    //TODO: MAKE SURE THIS IS WORKING
-    //FIXME: double check the case when tail is increamented while the list
-    //       is empty
-    //case 1: head and tail are at the same location
-    if (free_list->head == free_list->tail){
-        if (free_list->head_phase != free_list->tail_phase){
-            return 0;
-        } else {
-            return free_list_size;
-        }
-    }
-    //case 2: head and tail are at different locations
-    //between H and T: free regs (adjust based on the rotations)
-    //between T and H: occupied in the AL
-    //FIXME: is this the correct algorithm?
-    int diff = free_list->tail - free_list->head;
-    if (diff < 0){
-        diff += free_list_size;
+int renamer::free_list_regs_available(){
+    if (this->free_list_is_full()) return this->free_list_size;
+    if (this->free_list_is_empty()) return 0;
+
+    //only in two case we have the correct result
+    // T > H and HP == TP, (T-H) available
+    // T < H and TP - HP == 1, (T-H + size) available
+    int result;
+    if ((this->fl.tail > this->fl.head) && (this->fl.tail_phase == this->fl.head_phase)){
+        result = this->fl.tail - this->fl.head; 
+    } 
+    
+    else if ((this->fl.tail < this->fl.head) && (this->fl.tail_phase > this->fl.head_phase)){
+        result = this->fl.tail - this->fl.head + this->free_list_size;
     }
     
-    return diff;
+    else {
+        //Inconsistent state
+        result = -1;
+    }
+
+    return result;
 }
 
 bool renamer::stall_reg(uint64_t bundle_dst){
@@ -99,7 +100,12 @@ bool renamer::stall_reg(uint64_t bundle_dst){
     //if the number of available registers are less than
     //the input return false, otherwise return true
 
-    int available_physical_regs = this->get_free_reg_count(&this->fl, this->free_list_size);
+    int available_physical_regs = this->free_list_regs_available();
+    if (available_physical_regs == -1) {
+        printf("FATAL ERROR: free list is in incosistent state\n");
+        exit(EXIT_FAILURE);
+    }
+
     if (available_physical_regs < bundle_dst){
         return true;
     }
@@ -114,26 +120,68 @@ uint64_t renamer::rename_rsrc(uint64_t log_reg){
     return this->rmt[log_reg]; 
 }
 
+bool renamer::free_list_is_empty(){
+    if ((this->fl.head == this->fl.tail) && 
+        (this->fl.head_phase == this->fl.tail_phase)) return true;
+
+    return false;
+}
+
+bool renamer::free_list_is_full(){
+    if ((this->fl.head == this->fl.tail) && 
+        (this->fl.head_phase != this->fl.tail_phase)) return true;
+
+    return false;
+}
+
+bool renamer::push_free_list(uint64_t phys_reg){
+    //if it's full, you cannot push more into it
+    if (this->free_list_is_full()){
+        return false;
+    }
+
+    this->fl.list[this->fl.tail] = phys_reg;
+    //  - advance tail ptr
+    this->fl.tail++;
+    if (this->fl.tail == this->free_list_size){
+        this->fl.tail = 0;
+        this->fl.tail_phase = !this->fl.tail_phase;
+    }
+  
+    return true; 
+}
+
+uint64_t renamer::pop_free_list(){
+    //TODO: if free list is empty do not return anything
+    if (this->free_list_is_empty()){
+        return UINT64_MAX;
+    }
+
+    uint64_t result;
+    result = this->fl.list[this->fl.head];
+
+    //increase head pointer of free list
+    this->fl.head++;
+    if (this->fl.head == this->free_list_size){
+        //wrap around
+        this->fl.head = 0;
+        this->fl.head_phase = !this->fl.head_phase;
+    }
+
+    return result;
+
+}
 uint64_t renamer::rename_rdst(uint64_t log_reg){
     //phys. dest. reg. = pop new mapping from free list
     //RMT[logical dest. reg.] = phys. dest. reg.
 
-    uint64_t result;
-    if (this->get_free_reg_count(&this->fl, this->free_list_size) > 0){
-        //read out the content of head of free list
-        result = this->fl.list[this->fl.head];
-        //increase head pointer of free list
-        this->fl.head++;
-        if (this->fl.head == this->free_list_size){
-            //wrap around
-            this->fl.head = 0;
-            this->fl.head_phase = !this->fl.head_phase;
-        }
-        //update RMT
-        this->rmt[log_reg] = result; 
-    } else {
+    uint64_t result = this->pop_free_list();
+    if (result == UINT64_MAX){
         printf("FATAL ERROR: rename_rdst - not enough free list entry\n");
         exit(EXIT_FAILURE);
+    } else {
+        //update RMT
+        this->rmt[log_reg] = result; 
     }
    
     return result; 
@@ -194,7 +242,7 @@ uint64_t renamer::checkpoint(){
     uint64_t gbm_bit = this->allocate_gbm_bit();
     if ((gbm_bit < 0) | (gbm_bit > 63)){
         printf("This should not happen. Could not allocate checkpoint, should stall\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     this->checkpoints[gbm_bit] = temp;
@@ -373,16 +421,13 @@ void renamer::commit(){
     //find the physical dst register by looking up the AMT with logical reg
     //EXCEPTION: only if the instruction has a valid destination
     if (al_head->has_dest){
-        int old_mapping = this->amt[al_head->logical];
+        uint64_t old_mapping = this->amt[al_head->logical];
         //push the freed reg to the free list
         //  - insert at it the tail
-
-        this->fl.list[this->fl.tail] = old_mapping;
-        //  - advance tail ptr
-        this->fl.tail++;
-        if (this->fl.tail == this->free_list_size){
-            this->fl.tail = 0;
-            this->fl.tail_phase = !this->fl.head_phase;
+        bool success = this->push_free_list(old_mapping);
+        if (!success){
+            printf("FATAL ERROR: tried to push registers when the free list is full\n");
+            exit(EXIT_FAILURE);
         }
     }
 
@@ -462,6 +507,7 @@ bool renamer::get_exception(uint64_t AL_index){
     //TODO: throw exception if AL_index is invalid
     return this->al.list[AL_index].exception; 
 }
+
 
 int renamer::get_free_al_entry_count(int active_list_size){
     if (active_list_size) return active_list_size;
