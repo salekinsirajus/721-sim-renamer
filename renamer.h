@@ -570,4 +570,5 @@ public:
     bool push_free_list(uint64_t phys_reg);
     uint64_t pop_free_list();
     int free_list_regs_available();
+    void restore_free_list();
 };

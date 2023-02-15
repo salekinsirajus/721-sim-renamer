@@ -134,6 +134,13 @@ bool renamer::free_list_is_full(){
     return false;
 }
 
+void renamer::restore_free_list(){
+    //TODO/FIXME: test this works
+    //restore free list
+    this->fl.head = this->fl.tail;
+    this->fl.head_phase = !this->fl.tail_phase;
+}
+
 bool renamer::push_free_list(uint64_t phys_reg){
     //if it's full, you cannot push more into it
     if (this->free_list_is_full()){
@@ -464,6 +471,7 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
     }
 }
 
+
 void renamer::squash(){
     //FIXME: Not Implemented
     //What does squashing entail?
@@ -471,9 +479,7 @@ void renamer::squash(){
     this->al.head = this->al.tail;
     this->al.head_phase = this->al.tail_phase;
     
-    //restore free list    
-    this->fl.head = this->fl.tail;
-    this->fl.head_phase = !this->fl.tail_phase;
+    this->restore_free_list();
 
     //copy AMT to RMT
     int i;
