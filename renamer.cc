@@ -363,23 +363,26 @@ void renamer::commit(){
     al_head = &this->al.list[this->al.head];
     //FIXME: make sure the satements like above is returning the correct stuff
 
-    //assert different bits are correct 
+    //assert different bits are correct
     assert(al_head->completed);
     assert(!al_head->exception);
     assert(!al_head->load_violation);
-    
+
     //commit the instruction at the head of the active list
     //find the physical dst register by looking up the AMT with logical reg
-    int to_be_freed = this->amt[al_head->logical]; 
-    //push the freed reg to the free list 
-    //  - insert at it the tail
-    
-    this->fl.list[this->fl.tail] = to_be_freed;
-    //  - advance tail ptr
-    this->fl.tail++; 
-    if (this->fl.tail == this->free_list_size){
-        this->fl.tail = 0;
-        this->fl.tail_phase = !this->fl.head_phase;
+    //EXCEPTION: only if the instruction has a valid destination
+    if (al_head->has_dest){
+        int to_be_freed = this->amt[al_head->logical];
+        //push the freed reg to the free list
+        //  - insert at it the tail
+
+        this->fl.list[this->fl.tail] = to_be_freed;
+        //  - advance tail ptr
+        this->fl.tail++;
+        if (this->fl.tail == this->free_list_size){
+            this->fl.tail = 0;
+            this->fl.tail_phase = !this->fl.head_phase;
+        }
     }
 
     //TODO: updating other structures like AMT, RMT, Free list, Shadow Map Table?
@@ -390,7 +393,7 @@ void renamer::commit(){
         this->al.head = 0;
         this->al.head_phase = !this->al.head_phase;
     }
-    
+
     return;
 }
 
