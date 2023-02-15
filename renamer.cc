@@ -188,31 +188,8 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
     //RMT[logical dest. reg.] = phys. dest. reg.
     printf("renamer::rename_rdst() called\n");
 
-<<<<<<< HEAD
     uint64_t result = this->pop_free_list();
     if (result == UINT64_MAX){
-=======
-    uint64_t result;
-    if (this->get_free_reg_count(&this->fl, this->free_list_size) > 0){
-        //read out the content of head of free list
-        result = this->fl.list[this->fl.head];
-        //increase head pointer of free list
-        this->fl.head++;
-        if (this->fl.head == this->free_list_size){
-            //wrap around
-            this->fl.head = 0;
-            this->fl.head_phase = !this->fl.head_phase;
-        }
-        //update RMT
-        //printf("RMT+PRF before updating with popped register from the free list\n");
-        //this->print_rmt();
-        //this->print_prf();
-        this->rmt[log_reg] = result; 
-        //printf("RMT+PRF after updating with popped register from the free list\n");
-        //this->print_rmt();
-        //this->print_prf();
-    } else {
->>>>>>> Added more debugging statements
         printf("FATAL ERROR: rename_rdst - not enough free list entry\n");
         exit(EXIT_FAILURE);
     } else {
@@ -223,7 +200,7 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
     //FIXME: what happens to the old mapping?????
     printf("renamer::rename_rdst(%d) = amt[%d], rmt[%d]\n", log_reg, this->amt[log_reg], this->rmt[log_reg]);
     printf("renamer::rename_rdst(%d) = %d\n", log_reg, this->rmt[log_reg]);
-    return result; 
+    return popped_from_fl_head; 
 }
 
 int renamer::allocate_gbm_bit(){
