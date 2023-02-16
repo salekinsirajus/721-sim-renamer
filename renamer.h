@@ -87,19 +87,19 @@ private:
     // * Structure includes head, tail, and their phase bits.
     /////////////////////////////////////////////////////////////////////
     typedef struct al_entry_t{
-        unsigned       has_dest;
-        unsigned        logical;
-        unsigned       physical;
-        unsigned      completed;
-        unsigned      exception;
-        unsigned load_violation;
-        unsigned  br_mispredict;
-        unsigned val_mispredict;
-        unsigned        is_load;
-        unsigned       is_store;
-        unsigned      is_branch;
-        unsigned         is_amo;
-        unsigned         is_csr;
+        bool           has_dest;
+        uint64_t        logical;
+        uint64_t       physical;
+        bool          completed;
+        bool          exception;
+        bool     load_violation;
+        bool      br_mispredict;
+        bool     val_mispredict;
+        bool            is_load;
+        bool           is_store;
+        bool          is_branch;
+        bool             is_amo;
+        bool             is_csr;
         uint64_t             pc;
     } al_entry;
 
@@ -561,9 +561,11 @@ public:
     //////////////////////////////////////////
     // Helper functions later implemented  .//
     //////////////////////////////////////////
-    int get_free_al_entry_count(int active_list_size);
+    int get_free_al_entry_count();
     bool active_list_is_empty();
     bool active_list_is_full();
+    uint64_t insert_into_active_list();
+    bool retire_from_active_list();
 
     bool free_list_is_empty();
     bool free_list_is_full();

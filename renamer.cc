@@ -41,6 +41,7 @@ renamer::renamer(uint64_t n_log_regs,
     al.tail = 0;
     al.head_phase = 0;
     al.tail_phase = 0;    
+    assert(active_list_is_empty());
 
     for (i=0; i<n_active; i++){
         init_al_entry(&al.list[i]);
@@ -260,6 +261,23 @@ uint64_t renamer::checkpoint(){
     return gbm_bit;
 }
 
+uint64_t renamer::insert_into_active_list(){
+    //if it's full, you cannot push more into it
+    if (this->active_list_is_full()){
+        return UINT64_MAX; 
+    }
+
+    uint64_t insertion_point = this->al.tail;
+
+    this->al.tail++;
+    if (this->al.tail == this->active_list_size){
+        this->al.tail = 0;
+        this->al.tail_phase = !this->al.tail_phase;
+    }
+  
+    return insertion_point;
+}
+
 uint64_t renamer::dispatch_inst(bool dest_valid,
                            uint64_t log_reg,
                            uint64_t phys_reg,
@@ -272,21 +290,33 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
     /* Mechanism: Reserve entry at tail, write the instruction's logical
       and physical destination register specifiers, increment tail pointer
     */
-    if (this->stall_dispatch(1)){
+    if (this->stall_dispatch(true)){
         //well HOW DO YOU ACTUALLY STALL DISPATCH??
         //FIXME: the following is wrong, used as a placeholder
         exit(EXIT_FAILURE);
     }
 
-    //assert active list is not full
-    assert(!this->active_list_is_full());
+    uint64_t idx_at_al = this->insert_into_active_list(); 
+    if (idx_at_al == UINT64_MAX){
+        //assert active list is not full
+        //assert(!this->active_list_is_full());
+        printf("FATAL ERROR: cannot insert when active list is full\n");
+        exit(EXIT_FAILURE);
+    }
 
     //make a new active list entry
     al_entry_t *active_list_entry;
-    active_list_entry = &this->al.list[this->al.tail];
+    active_list_entry = &this->al.list[idx_at_al]; //WIP
+
     active_list_entry->has_dest = dest_valid;
-    active_list_entry->logical = (dest_valid) ? log_reg: 0;
-    active_list_entry->physical = (dest_valid) ? phys_reg: 0;
+    if (dest_valid == true){
+        active_list_entry->logical = log_reg;
+        active_list_entry->physical = phys_reg;
+    } else {
+        active_list_entry->logical = 67; //this should not be causing problems
+        active_list_entry->physical = 67; //this should not be causing problems
+    }
+
     active_list_entry->completed = 0; //just dispatched
     active_list_entry->exception = 0; //just dispatched
     active_list_entry->is_load = load;
@@ -296,14 +326,7 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
     active_list_entry->is_csr = csr;
     active_list_entry->pc = PC;
     //saving the index to return at the end of the function
-    uint64_t idx_at_al = this->al.tail; 
-
-    this->al.tail++;
-    //wrap around of al.tail is at the size of AL
-    if (this->al.tail == this->active_list_size){
-        this->al.tail = 0;
-        this->al.tail_phase = !this->al.tail_phase;
-    }
+    
 
     return idx_at_al;
 }
@@ -317,7 +340,7 @@ bool renamer::stall_dispatch(uint64_t bundle_dst){
     }
    
     //WIP: find how many entries are available in the Active List  
-    if (this->get_free_al_entry_count(this->active_list_size) < bundle_dst){
+    if (this->get_free_al_entry_count() < bundle_dst){
         printf("Number of free entries are less than what's needed\n");
         return true;
     }
@@ -396,6 +419,9 @@ bool renamer::precommit(bool &completed,
     //set the flags
     al_entry_t *head;
     head = &this->al.list[this->al.head];
+    
+    printf("precommit(): before - completed: %d, exception: %d, is_load: %d, is_store: %d, pc: %lld\n",
+            completed, exception, load, store, PC);
 
     completed = head->completed; 
     exception = head->exception;
@@ -408,6 +434,9 @@ bool renamer::precommit(bool &completed,
     amo       = head->is_amo;
     csr       = head->is_csr;
     PC        = head->pc;
+
+    printf("precommit(): after - completed: %d, exception: %d, is_load: %d, is_store: %d, pc: %lld\n",
+            completed, exception, load, store, PC);
 
     return true;
 }
@@ -427,30 +456,51 @@ void renamer::commit(){
     //commit the instruction at the head of the active list
     //find the physical dst register by looking up the AMT with logical reg
     //EXCEPTION: only if the instruction has a valid destination
-    if (al_head->has_dest){
+    bool op;
+    if (al_head->has_dest == true){
+        printf("commit(): insn being committed: completed: %d, exc: %d, is_load: %d, is_store: %d, has_dest: %d\n",
+                al_head->completed, al_head->exception, al_head->is_load, al_head->is_store, al_head->has_dest
+        );
         uint64_t old_mapping = this->amt[al_head->logical];
-        //push the freed reg to the free list
-        //  - insert at it the tail
-        bool success = this->push_free_list(old_mapping);
-        if (!success){
-            printf("FATAL ERROR: tried to push registers when the free list is full\n");
+        printf("commit(): old mapping at AMT: %d\n", this->amt[al_head->logical]);
+
+        //Update AMT with with new mapping 
+        this->amt[al_head->logical] = al_head->physical;
+
+        printf("commit(): new mapping at AMT: %d\n", this->amt[al_head->logical]);
+
+        op = this->push_free_list(old_mapping);
+        if (op == false){
+            printf("FATAL ERROR: tried to push when the free list is full\n");
             exit(EXIT_FAILURE);
         }
     }
 
-    //Update AMT with with new mapping 
-    this->amt[al_head->logical] = al_head->physical;
+    //TODO: update other structures like AMT, RMT, Free list, Shadow Map Table?
+    op = this->retire_from_active_list();
+    if (op == false){
+        printf("FATAL ERROR: could not retire from AL since its empty\n");
+        exit(EXIT_FAILURE);
+    }
 
-    //TODO: updating other structures like AMT, RMT, Free list, Shadow Map Table?
-    //advance head pointer of the Active List
+    return;
+}
+
+bool renamer::retire_from_active_list(){
+    //TODO: if free list is empty do not return anything
+    if (this->active_list_is_empty()){
+        return false;
+    }
+
+    //increase head pointer of free list
     this->al.head++;
-    //FIXME: do we wrap the active list the same way we do freelist?
     if (this->al.head == this->active_list_size){
+        //wrap around
         this->al.head = 0;
         this->al.head_phase = !this->al.head_phase;
     }
 
-    return;
+    return true;
 }
 
 void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
@@ -515,16 +565,29 @@ bool renamer::get_exception(uint64_t AL_index){
 }
 
 
-int renamer::get_free_al_entry_count(int active_list_size){
-    if (active_list_size) return active_list_size;
-    
-    //TODO/FIXME: this seems kinda whack, double check
-    int diff = this->al.tail - this->al.head;
-    if (diff < 0){
-        diff += active_list_size;
+int renamer::get_free_al_entry_count(){
+    if (this->active_list_is_full()) return 0;
+    if (this->active_list_is_empty()) return this->active_list_size;
+
+    if (this->al.head_phase != this->al.tail_phase){
+        //inconsistent state otherwise
+        assert(this->al.head > this->al.tail);
+        //h(1), t(0)
+        if (this->al.head_phase > this->al.tail_phase){
+            //available
+            return this->al.head - this->al.tail;
+        } else { //h(0), t(1)
+            //available
+            return this->al.tail - this->al.head;
+        }
     }
 
-    return diff;
+    if (this->al.head_phase == this->al.tail_phase){
+        assert(this->al.tail > this->al.head);
+        // t-h = occupied
+        return this->active_list_size - (this->al.tail - this->al.head);
+    }
+
 }
 
 bool renamer::active_list_is_full(){
@@ -548,6 +611,7 @@ bool renamer::active_list_is_empty(){
 }
 
 void renamer::init_al_entry(al_entry_t *ale){
+    //WIP: fix the type
     //initiate all fields to 0 
     ale->has_dest=0;
     ale->logical=0;
