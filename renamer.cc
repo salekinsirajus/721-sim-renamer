@@ -1,3 +1,5 @@
+#define __STDC_FORMAT_MACROS
+
 #include "renamer.h"
 #include <cassert>
 
@@ -30,8 +32,13 @@ renamer::renamer(uint64_t n_log_regs,
         //then all the logical registers are mapped to p0. OTOH, amt[0] = 0 and
         //amt[1] = 1,..., amt[n] = n indicate r0->p0, r1->p1,..
         //the contents of the prf does not matter I suppose.
-        amt[i] = i;
-        rmt[i] = i;
+    }
+
+    uint64_t j;
+    for (j=0; j < n_log_regs; j++){
+        amt[j] = j;
+        rmt[j] = j;
+
     }
 
     //active list
@@ -69,6 +76,11 @@ renamer::renamer(uint64_t n_log_regs,
     num_checkpoints = sizeof(uint64_t)*8;
     checkpoints = new checkpoint_t[num_checkpoints];
 
+
+    printf("----------Initial AMT and RMT-----------\n");
+    print_amt();
+    print_rmt();
+    printf("----------End Initial AMT and RMT-----------\n");
 }
 
 int renamer::free_list_regs_available(){
@@ -152,6 +164,7 @@ bool renamer::push_free_list(uint64_t phys_reg){
         return false;
     }
 
+    printf("push_free_list(): pushing prf[%llu]   to the free list\n", phys_reg);
     this->fl.list[this->fl.tail] = phys_reg;
     //  - advance tail ptr
     this->fl.tail++;
@@ -171,6 +184,7 @@ uint64_t renamer::pop_free_list(){
 
     uint64_t result;
     result = this->fl.list[this->fl.head];
+    printf("pop_free_list(): popping prf[%llu] from the free list\n", result);
 
     //increase head pointer of free list
     this->fl.head++;
@@ -200,7 +214,7 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
     //FIXME: what happens to the old mapping?????
     printf("renamer::rename_rdst(%d) = amt[%d], rmt[%d]\n", log_reg, this->amt[log_reg], this->rmt[log_reg]);
     printf("renamer::rename_rdst(%d) = %d\n", log_reg, this->rmt[log_reg]);
-    return popped_from_fl_head; 
+    return result;
 }
 
 int renamer::allocate_gbm_bit(){
@@ -335,6 +349,9 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
     active_list_entry->is_csr = csr;
     active_list_entry->pc = PC;
     //saving the index to return at the end of the function
+
+    printf("After insert_into_active_list() in dispatch_inst: printing active list\n");
+    print_active_list(true);
     
 
     return idx_at_al;
@@ -400,7 +417,7 @@ void renamer::set_complete(uint64_t AL_index){
     printf("renamer::set_complete() AL index: %d\n", AL_index);
  
     //TODO: check validity of the input
-    this->al.list[AL_index].completed = 1; 
+    this->al.list[AL_index].completed = true; 
     //this->print_active_list(0);
     //this->print_rmt();
     //this->print_amt();
@@ -434,10 +451,10 @@ bool renamer::precommit(bool &completed,
                         bool &branch, bool &amo, bool &csr,
                         uint64_t &PC){
 
-    printf("renamer::precommit() is called\n");
+    //printf("renamer::precommit() is called\n");
 
     if (this->active_list_is_empty()){
-        printf("renamer::precommit() - active list is empty.\n");
+       // printf("renamer::precommit() - active list is empty.\n");
         return false; 
     }
 
@@ -481,17 +498,22 @@ void renamer::commit(){
 
     //commit the instruction at the head of the active list
     //find the physical dst register by looking up the AMT with logical reg
+    printf("commit(): insn being committed: completed: %d, exc: %d, is_load: %d, is_store: %d, has_dest: %d\n",
+            al_head->completed, al_head->exception, al_head->is_load, al_head->is_store, al_head->has_dest
+    );
     //EXCEPTION: only if the instruction has a valid destination
     bool op;
     if (al_head->has_dest == true){
-        printf("commit(): insn being committed: completed: %d, exc: %d, is_load: %d, is_store: %d, has_dest: %d\n",
-                al_head->completed, al_head->exception, al_head->is_load, al_head->is_store, al_head->has_dest
-        );
+        printf("commit(): AL head at (before): %d\n", this->al.head);
+        printf("commit(): befor PRF[%d]=%llu, PRF_READY[%d]=%llu\n",
+                al_head->physical, this->prf[al_head->physical], al_head->physical, this->prf_ready[al_head->physical]);
         uint64_t old_mapping = this->amt[al_head->logical];
         printf("commit(): old mapping at AMT: %d\n", this->amt[al_head->logical]);
 
         //Update AMT with with new mapping 
         this->amt[al_head->logical] = al_head->physical;
+        printf("commit(): after PRF[%d]=%llu, PRF_READY[%d]=%llu\n",
+                al_head->physical, this->prf[al_head->physical], al_head->physical, this->prf_ready[al_head->physical]);
 
         printf("commit(): new mapping at AMT: %d\n", this->amt[al_head->logical]);
 
@@ -508,6 +530,8 @@ void renamer::commit(){
         printf("FATAL ERROR: could not retire from AL since its empty\n");
         exit(EXIT_FAILURE);
     }
+
+    printf("commit(): AL head at (after): %d\n", this->al.head);
 
     return;
 }
@@ -652,11 +676,13 @@ void renamer::print_active_list(bool between_head_and_tail){
         i = this->al.head;
         n = this->al.tail;
     }
-    printf("| idx | log| phys | com | exc |\n");
+    printf("| idx | log| phys | com | exc | dest | PC |\n");
     for (i; i < n; i++){
         al_entry_t *t;
         t = &this->al.list[i];
-        printf("| %3d | %3d | %3d | %3d | %3d |\n", i, t->logical, t->physical, t->completed, t->exception);   
+        printf("| %3d | %3d | %3d | %3d | %3d | %d| %llu |\n",
+                i, t->logical, t->physical, t->completed,
+                t->exception, t->has_dest, t->pc);
     }
     printf("AL Head: %d, AL tail: %d, Head Phase: %d, Tail Phase: %d\n",
             this->al.head, this->al.tail, this->al.head_phase, this->al.tail_phase
@@ -683,8 +709,20 @@ void renamer::init_al_entry(al_entry_t *ale){
     ale->pc=0;
 }
 
+
 //Debugging helper functions
-void renamer::print_free_list(){}
+void renamer::print_free_list(){
+    uint64_t i=0;
+    printf("--------------FREE LIST-------------------\n");
+    while (i < free_list_size){
+        if (i == fl.tail) printf("|%llu T(%d)", fl.list[i], fl.tail, fl.tail_phase);
+        if (i == fl.head) printf("|%llu H(%d)", fl.list[i], fl.head, fl.head_phase);
+        if (i != fl.head && i != fl.tail) printf("|%3llu ", fl.list[i]);
+        i++;
+    }
+    printf("|\n");
+    printf("------------END FREE LIST-----------------\n");
+}
 void renamer::print_amt(){
     printf("---------------------AMT-----------------\n");
     for (int i=0; i < this->map_table_size; i++){
@@ -703,8 +741,16 @@ void renamer::print_rmt(){
 void renamer::print_prf(){
     printf("---------------------PRF-----------------\n");
     for (int i=0; i < this->num_phys_reg; i++){
-        printf("| %16d ", prf[i]);
+        printf("| %8llu ", prf[i]);
     }
     printf("\n-------------------END_PRF-----------------\n");
+
+}
+void renamer::print_prf_ready(){
+    printf("---------------------PRF_READY-----------------\n");
+    for (int i=0; i < this->num_phys_reg; i++){
+        printf("| %llu ", prf_ready[i]);
+    }
+    printf("\n-------------------END_PRF_READY-----------------\n");
 
 }

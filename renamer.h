@@ -577,5 +577,6 @@ public:
     void print_amt();
     void print_rmt();
     void print_prf();
+    void print_prf_ready();
     void print_active_list(bool between_head_and_tail);
 };

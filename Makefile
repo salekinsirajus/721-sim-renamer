@@ -1,6 +1,6 @@
 CC = g++
 #OPT = -O3
-OPT = -g
+OPT = -g -Wall
 
 INC = -I.
 LIB = -L.
