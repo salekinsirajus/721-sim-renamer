@@ -27,6 +27,7 @@ renamer::renamer(uint64_t n_log_regs,
     //setting the ready bits to 1 (meaning no pending registers)
     for (i=0; i < n_phys_regs; i++){
         prf_ready[i] = 1;
+        //prf[i] = i; //New addition 
         //AMT and RMT should have the same value at the beginning
         //However, not sure what would the content be. if amt[0] = 0, amt[1] = 0
         //then all the logical registers are mapped to p0. OTOH, amt[0] = 0 and
@@ -36,8 +37,8 @@ renamer::renamer(uint64_t n_log_regs,
 
     uint64_t j;
     for (j=0; j < n_log_regs; j++){
-        amt[j] = j;
-        rmt[j] = j;
+        amt[n_log_regs - 1 - j] = j;
+        rmt[n_log_regs - 1 - j] = j;
 
     }
 
@@ -66,7 +67,7 @@ renamer::renamer(uint64_t n_log_regs,
 
     //FIXME: (potential issues) What should be the content of the free list?
     for (i=0; i <free_list_size; i++){
-        fl.list[i] = i; //these should be unique values
+        fl.list[i] = n_log_regs + i;
     }
 
     //checkpoint stuff
@@ -81,6 +82,9 @@ renamer::renamer(uint64_t n_log_regs,
     print_amt();
     print_rmt();
     printf("----------End Initial AMT and RMT-----------\n");
+    printf("----------Initial Free List---------------\n");
+    print_free_list();
+    printf("--------End Initial Free List-------------\n");
 }
 
 int renamer::free_list_regs_available(){
@@ -114,6 +118,9 @@ bool renamer::stall_reg(uint64_t bundle_dst){
 
     int available_physical_regs = this->free_list_regs_available();
     if (available_physical_regs == -1) {
+        printf("Free List: head %d, tail %d, head_phase %d, tail_phase %d\n",
+            fl.head, fl.tail, fl.head_phase, fl.tail_phase
+        );
         printf("FATAL ERROR: free list is in incosistent state\n");
         exit(EXIT_FAILURE);
     }
@@ -171,6 +178,8 @@ bool renamer::push_free_list(uint64_t phys_reg){
         this->fl.tail = 0;
         this->fl.tail_phase = !this->fl.tail_phase;
     }
+
+    printf("FREELIST: Free register count after PUSH: %d\n", this->free_list_regs_available());
   
     return true; 
 }
@@ -193,6 +202,8 @@ uint64_t renamer::pop_free_list(){
         this->fl.head_phase = !this->fl.head_phase;
     }
 
+    printf("FREELIST: Free register count after POP : %d\n", this->free_list_regs_available());
+
     return result;
 
 }
@@ -211,7 +222,7 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
     }
    
     //FIXME: what happens to the old mapping?????
-    printf("renamer::rename_rdst(%d) = amt[%d], rmt[%d]\n", log_reg, this->amt[log_reg], this->rmt[log_reg]);
+    printf("renamer::rename_rdst(%d) = amt r%d[%d], rmt r%d[%d]\n", log_reg, log_reg, this->amt[log_reg], log_reg, this->rmt[log_reg]);
     printf("renamer::rename_rdst(%d) = %d\n", log_reg, this->rmt[log_reg]);
     return result;
 }
@@ -311,11 +322,15 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
     /* Mechanism: Reserve entry at tail, write the instruction's logical
       and physical destination register specifiers, increment tail pointer
     */
+    /*
     if (this->stall_dispatch(true)){
         //well HOW DO YOU ACTUALLY STALL DISPATCH??
         //FIXME: the following is wrong, used as a placeholder
+        printf("We called stall dispatch - from dispatch_inst");
         exit(EXIT_FAILURE);
-    }
+    }*/
+    assert(!this->active_list_is_full());
+
     printf("renamer::dispatch_inst() is called\n");
 
     uint64_t idx_at_al = this->insert_into_active_list(); 
@@ -358,9 +373,8 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
 
 bool renamer::stall_dispatch(uint64_t bundle_dst){
     //Assert Active List is not full
-    if ((this->al.head == this->al.tail) && 
-        (this->al.head_phase != this->al.tail_phase)){
-        printf("Active List is full, call stall_dispatch\n");
+    if (this->active_list_is_full()){
+        printf("Active List is full, stalling dispatch\n");
         return true;
     }
    
@@ -426,21 +440,31 @@ bool renamer::stall_branch(uint64_t bundle_branch){
     //TODO: IS THIS THE RIGHT ALGORITHM?
     //if the number of zero's in GBM is less than bundle_branch return true
     //return false otherwise TODO: is there multiple value of GBM
+    //total_bits = num_checkpoints
     printf("renamer::stall_branch() is called\n");
-    int one_bit_counter = 0;
-    int gbm_copy = this->GBM;
 
-    while (gbm_copy){
-        if (gbm_copy & 1){
-            one_bit_counter++;
-            gbm_copy >>= 1;
+    uint64_t gbm = this->GBM;
+    //simple use case, all taken, DO STALL
+    if (gbm == UINT64_MAX) return true;
+
+    int free_count=0;
+    int n = num_checkpoints;
+    uint64_t mask = 1;
+    
+    int i;
+    for (i=0; i<n; i++){
+        if (gbm & mask){
+            mask <<= 1;
+        } else {
+            mask <<= 1;
+            free_count++;
         }
     }
 
-    if ((sizeof(this->GBM) * 8) - one_bit_counter < bundle_branch){
-        return true;
-    }
-
+    //not enough space, DO STALL
+    if (free_count < bundle_branch) return true;
+    
+    //free_count >= bundle_branch, enough space available. DONT STALL
     return false;
 } 
 
@@ -461,8 +485,8 @@ bool renamer::precommit(bool &completed,
     al_entry_t *head;
     head = &this->al.list[this->al.head];
     
-    printf("precommit(): before - completed: %d, exception: %d, is_load: %d, is_store: %d, pc: %lld\n",
-            completed, exception, load, store, PC);
+    //printf("precommit(): before - completed: %d, exception: %d, is_load: %d, is_store: %d, pc: %lld\n",
+    //completed, exception, load, store, PC);
 
     completed = head->completed; 
     exception = head->exception;
@@ -511,6 +535,7 @@ void renamer::commit(){
 
         //Update AMT with with new mapping 
         this->amt[al_head->logical] = al_head->physical;
+        printf("commit() RMT and AMT should have same mapping now? \n"); //WIP:FIXME
         printf("commit(): after PRF[%d]=%llu, PRF_READY[%d]=%llu\n",
                 al_head->physical, this->prf[al_head->physical], al_head->physical, this->prf_ready[al_head->physical]);
 
@@ -563,11 +588,11 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
     printf("renamer::resolve() is called\n");
     if (correct){ //branch was predicted correctly
         //clear the GBM bit by indexing with branch_ID
-        this->GBM  |= (1ULL<<branch_ID);
+        this->GBM  &= ~(1ULL<<branch_ID);
         //clear all the checkpointed GBMs;
         int i;
         for (i=0; i < this->num_checkpoints; i++){
-            this->checkpoints[i].gbm |= (1ULL << branch_ID);
+            this->checkpoints[i].gbm &= ~(1ULL<<branch_ID);
         } 
         //TODO: (verify) resetting the in_use to false
         this->checkpoints[branch_ID].__in_use = false; 
