@@ -665,26 +665,21 @@ int renamer::get_free_al_entry_count(){
     if (this->active_list_is_full()) return 0;
     if (this->active_list_is_empty()) return this->active_list_size;
 
-    if (this->al.head_phase != this->al.tail_phase){
-        //inconsistent state otherwise
-        assert(this->al.head > this->al.tail);
-        //h(1), t(0)
-        if (this->al.head_phase > this->al.tail_phase){
-            //available
-            return this->al.head - this->al.tail;
-        } else { //h(0), t(1)
-            //available
-            return this->al.tail - this->al.head;
-        }
-    }
-
+    int used, free;
     if (this->al.head_phase == this->al.tail_phase){
         assert(this->al.tail > this->al.head);
-        // t-h = occupied
-        // OLd: return this->active_list_size - (this->al.tail - this->al.head);
-        return (this->al.tail - this->al.head);
+        used = this->al.tail - this->al.head;
+        free = this->active_list_size - used;
+        return free;
+    }
+    else if (this->al.head_phase != this->al.tail_phase){
+        assert(this->al.head > this->al.tail);
+        free = this->al.head - this->al.tail; 
+        return free;
     }
 
+     // inconsistent state
+    return -1;
 }
 
 bool renamer::active_list_is_full(){
