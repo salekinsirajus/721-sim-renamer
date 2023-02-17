@@ -86,25 +86,24 @@ renamer::renamer(uint64_t n_log_regs,
 int renamer::free_list_regs_available(){
     if (this->free_list_is_full()) return this->free_list_size;
     if (this->free_list_is_empty()) return 0;
-
-    //only in two case we have the correct result
-    // T > H and HP == TP, (T-H) available
-    // T < H and TP - HP == 1, (T-H + size) available
-    int result;
-    if ((this->fl.tail > this->fl.head) && (this->fl.tail_phase == this->fl.head_phase)){
-        result = this->fl.tail - this->fl.head; 
-    } 
     
-    else if ((this->fl.tail < this->fl.head) && (this->fl.tail_phase > this->fl.head_phase)){
-        result = this->fl.tail - this->fl.head + this->free_list_size;
-    }
-    
-    else {
-        //Inconsistent state
-        result = -1;
+    if (this->fl.head_phase != this->fl.tail_phase){
+        //otherwise inconsistent state: tail cannot be ahead of head,
+        //means you are inserting entry when the list is already full
+        assert(this->fl.head > this->fl.tail);
+        return this->fl.tail - this->fl.head + this->free_list_size;
     }
 
-    return result;
+    if (this->fl.head_phase == this->fl.tail_phase){
+        //otherwise inconsistent state: head cant be ahead of tail, means
+        // it allocated registers it does not have
+        assert(this->fl.head < this->fl.tail);
+        //available regsiters
+        return this->fl.tail - this->fl.head;
+    }
+
+
+    return -1; //it should never come here bc of the assertions 
 }
 
 bool renamer::stall_reg(uint64_t bundle_dst){
