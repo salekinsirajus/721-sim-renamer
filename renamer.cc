@@ -7,6 +7,8 @@ renamer::renamer(uint64_t n_log_regs,
         uint64_t n_phys_regs,
         uint64_t n_branches,
         uint64_t n_active){
+
+    retired_insn = 0; //FIXME: delete this once you are done
     
     //Run the assertions
     assert(n_phys_regs > n_log_regs);
@@ -350,8 +352,8 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
         active_list_entry->logical = log_reg;
         active_list_entry->physical = phys_reg;
     } else {
-        active_list_entry->logical = 67; //this should not be causing problems
-        active_list_entry->physical = 67; //this should not be causing problems
+        active_list_entry->logical = UINT64_MAX; //this should not be causing problems
+        active_list_entry->physical = UINT64_MAX; //this should not be causing problems
     }
 
     active_list_entry->completed = 0; //just dispatched
@@ -373,17 +375,21 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
 
 bool renamer::stall_dispatch(uint64_t bundle_dst){
     //Assert Active List is not full
+    printf("stall_dispatch():\n");
+    int available_al_entry = this->get_free_al_entry_count();
+    printf("stall_dispatch(): free AL entry: %d\n", available_al_entry);
     if (this->active_list_is_full()){
-        printf("Active List is full, stalling dispatch\n");
+        printf("stall_dispatch(): Active List is full, stalling dispatch\n");
         return true;
     }
    
     //WIP: find how many entries are available in the Active List  
-    if (this->get_free_al_entry_count() < bundle_dst){
-        printf("Number of free entries are less than what's needed\n");
+    if ((available_al_entry < bundle_dst) || (available_al_entry <= 0)){
+        printf("stall_dispatch(): true - available: %d, needed: %d\n", available_al_entry, bundle_dst);
         return true;
     }
 
+    printf("stall_dispatch():: enough AL entry available, returning false\n");
     return false;
 }
 
@@ -514,10 +520,13 @@ void renamer::commit(){
     al_head = &this->al.list[this->al.head];
     //FIXME: make sure the satements like above is returning the correct stuff
 
+    printf("retire(): prertire_checks - completed: %d, exception: %d, is_load: %d, is_store: %d, pc: %lld\n",
+            al_head->completed, al_head->exception, al_head->is_load, al_head->is_store, al_head->pc);
+    printf("retire(): retired index %d from the Active List\n", al.head);
     //assert different bits are correct
-    assert(al_head->completed);
-    assert(!al_head->exception);
-    assert(!al_head->load_violation);
+    assert(al_head->completed == true);
+    assert(al_head->exception == false);
+    assert(al_head->load_violation == false);
 
     //commit the instruction at the head of the active list
     //find the physical dst register by looking up the AMT with logical reg
@@ -527,6 +536,7 @@ void renamer::commit(){
     //EXCEPTION: only if the instruction has a valid destination
     bool op;
     if (al_head->has_dest == true){
+        assert(this->free_list_is_full() != true);
         printf("commit(): AL head at (before): %d\n", this->al.head);
         printf("commit(): befor PRF[%d]=%llu, PRF_READY[%d]=%llu\n",
                 al_head->physical, this->prf[al_head->physical], al_head->physical, this->prf_ready[al_head->physical]);
@@ -556,6 +566,7 @@ void renamer::commit(){
     }
 
     printf("commit(): AL head at (after): %d\n", this->al.head);
+    printf("retired %d instructions so far\n", retired_insn++);
 
     return;
 }
@@ -571,6 +582,7 @@ bool renamer::retire_from_active_list(){
     ////printf("printing active list before increamenting the head pointer\n");
     ////this->print_active_list(0);
     this->al.head++;
+    this->al.list[al.head]._retired = true;
     if (this->al.head == this->active_list_size){
         //wrap around
         this->al.head = 0;
@@ -669,7 +681,8 @@ int renamer::get_free_al_entry_count(){
     if (this->al.head_phase == this->al.tail_phase){
         assert(this->al.tail > this->al.head);
         // t-h = occupied
-        return this->active_list_size - (this->al.tail - this->al.head);
+        // OLd: return this->active_list_size - (this->al.tail - this->al.head);
+        return (this->al.tail - this->al.head);
     }
 
 }
@@ -694,43 +707,25 @@ bool renamer::active_list_is_empty(){
     return false;
 }
 
-void renamer::print_active_list(bool between_head_and_tail){
-    int i=0, n=active_list_size;
-    if (between_head_and_tail) {
-        i = this->al.head;
-        n = this->al.tail;
-    }
-    printf("| idx | log| phys | com | exc | dest | PC |\n");
-    for (i; i < n; i++){
-        al_entry_t *t;
-        t = &this->al.list[i];
-        printf("| %3d | %3d | %3d | %3d | %3d | %d| %llu |\n",
-                i, t->logical, t->physical, t->completed,
-                t->exception, t->has_dest, t->pc);
-    }
-    printf("AL Head: %d, AL tail: %d, Head Phase: %d, Tail Phase: %d\n",
-            this->al.head, this->al.tail, this->al.head_phase, this->al.tail_phase
-        );
-
-}
 
 void renamer::init_al_entry(al_entry_t *ale){
-    //WIP: fix the type
+    //WIP: fix the values 
     //initiate all fields to 0 
-    ale->has_dest=0;
-    ale->logical=0;
-    ale->physical=0;
-    ale->completed=0;
-    ale->exception=0;
-    ale->load_violation=0;
-    ale->br_mispredict=0;
-    ale->val_mispredict=0;
-    ale->is_load=0;
-    ale->is_store=0;
-    ale->is_branch=0;
-    ale->is_amo=0;
-    ale->is_csr=0;
-    ale->pc=0;
+    ale->has_dest=false;
+    ale->logical=UINT64_MAX;
+    ale->physical=UINT64_MAX;
+    ale->completed=false;
+    ale->exception=false;
+    ale->load_violation=false;
+    ale->br_mispredict=false;
+    ale->val_mispredict=false;
+    ale->is_load=false;
+    ale->is_store=false;
+    ale->is_branch=false;
+    ale->is_amo=false;
+    ale->is_csr=false;
+    ale->pc=UINT64_MAX;
+    ale->_retired=false;
 }
 
 
@@ -776,5 +771,30 @@ void renamer::print_prf_ready(){
         printf("| %llu ", prf_ready[i]);
     }
     printf("\n-------------------END_PRF_READY-----------------\n");
+
+}
+void renamer::print_active_list(bool between_head_and_tail){
+    int i=0, n=active_list_size;
+    if (between_head_and_tail) {
+        i = this->al.head;
+        n = this->al.tail;
+    }
+    if (n - i <= 0){
+        i = 0;
+        n = active_list_size;
+        printf("ACTIVE LIST IS FULL. PRINTING ALL\n");
+    }
+
+    printf("| idx | log| phys | com | exc | dest | PC | _ret |\n");
+    for (i; i < n; i++){
+        al_entry_t *t;
+        t = &this->al.list[i];
+        printf("| %3d | %3d | %3d | %3d | %3d | %3d| %llu | %3d|\n",
+                i,     t->logical, t->physical, t->completed,
+                t->exception, t->has_dest, t->pc, t->_retired);
+    }
+    printf("AL Head: %d, AL tail: %d, Head Phase: %d, Tail Phase: %d\n",
+            this->al.head, this->al.tail, this->al.head_phase, this->al.tail_phase
+        );
 
 }

@@ -101,6 +101,7 @@ private:
         bool             is_amo;
         bool             is_csr;
         uint64_t             pc;
+        bool           _retired; //this is a bogus field, only for testing
     } al_entry;
 
     typedef struct active_list_t {
@@ -198,6 +199,7 @@ private:
     int allocate_gbm_bit();
     void init_al_entry(al_entry_t *ale);
 
+    int retired_insn;
 public:
     ////////////////////////////////////////
     // Public functions.
