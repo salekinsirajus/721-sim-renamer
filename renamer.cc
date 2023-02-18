@@ -743,8 +743,8 @@ void renamer::squash(){
 */
     //the renamer should be rolled back to the committed state of the machine
     //empty out the active list
-    this->al.head = this->al.tail;
-    this->al.head_phase = this->al.tail_phase;
+    this->al.tail = this->al.head;
+    this->al.tail_phase = this->al.head_phase;
     
     this->restore_free_list();
 
