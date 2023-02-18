@@ -743,20 +743,31 @@ void renamer::squash(){
 */
     //the renamer should be rolled back to the committed state of the machine
     //empty out the active list
+    //printf("squash gets called. WIP\n");
+    int i;
     this->al.tail = this->al.head;
     this->al.tail_phase = this->al.head_phase;
+    //clear out AL contents?
+    for (i=0; i < active_list_size; i++){
+        init_al_entry(&al.list[i]);
+    }
     
     this->restore_free_list();
 
     //copy AMT to RMT
-    int i;
     for (i=0; i < this->map_table_size; i++){
         rmt[i] = amt[i];
     }
     
     //What else is involved in squashing a renamer with AMT+RMT?
-
-    printf("squash gets called. Not Implemented\n");
+    //IF GBM contiains only speculative branch checkpoints, then set it 0
+    this->GBM = 0;
+    for (i=0; i<num_checkpoints; i++){
+        this->checkpoints[i].free_list_head = -1;
+        this->checkpoints[i].free_list_head_phase = -1;
+        this->checkpoints[i].gbm = 0;
+        this->checkpoints[i].shadow_map_table = {0};
+    } 
 
     return;
 }
