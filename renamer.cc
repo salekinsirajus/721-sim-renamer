@@ -368,8 +368,8 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
         active_list_entry->physical = UINT64_MAX; //this should not be causing problems
     }
 
-    active_list_entry->completed = 0; //just dispatched
-    active_list_entry->exception = 0; //just dispatched
+    active_list_entry->completed = false; //just dispatched
+    active_list_entry->exception = false; //just dispatched
     active_list_entry->is_load = load;
     active_list_entry->is_store = store;
     active_list_entry->is_branch = branch;
@@ -708,6 +708,7 @@ void renamer::squash(){
 /*
     printf("renamer::squash is called\n");
 */
+    //the renamer should be rolled back to the committed state of the machine
     //empty out the active list
     this->al.head = this->al.tail;
     this->al.head_phase = this->al.tail_phase;
