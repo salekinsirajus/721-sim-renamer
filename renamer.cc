@@ -25,10 +25,10 @@ renamer::renamer(uint64_t n_log_regs,
     prf_ready = new uint64_t[n_phys_regs];
     shadow_map_table_size = n_log_regs;
 
-    int i;
+    uint64_t j;
     //setting the ready bits to 1 (meaning no pending registers)
-    for (i=0; i < n_phys_regs; i++){
-        prf_ready[i] = 1;
+    for (j=0; j < n_phys_regs; j++){
+        prf_ready[j] = 1;
         //prf[i] = i; //New addition 
         //AMT and RMT should have the same value at the beginning
         //However, not sure what would the content be. if amt[0] = 0, amt[1] = 0
@@ -37,11 +37,9 @@ renamer::renamer(uint64_t n_log_regs,
         //the contents of the prf does not matter I suppose.
     }
 
-    uint64_t j;
     for (j=0; j < n_log_regs; j++){
         amt[n_log_regs - 1 - j] = j;
         rmt[n_log_regs - 1 - j] = j;
-
     }
 
     //active list
@@ -53,8 +51,8 @@ renamer::renamer(uint64_t n_log_regs,
     al.tail_phase = 0;    
     assert(active_list_is_empty());
 
-    for (i=0; i<n_active; i++){
-        init_al_entry(&al.list[i]);
+    for (j=0; j<n_active; j++){
+        init_al_entry(&al.list[j]);
     }
     
     //free list
@@ -68,6 +66,7 @@ renamer::renamer(uint64_t n_log_regs,
     assert(this->free_list_is_full()); //free list should be full at init
 
     //FIXME: (potential issues) What should be the content of the free list?
+    int i;
     for (i=0; i <free_list_size; i++){
         fl.list[i] = n_log_regs + i;
     }
@@ -93,11 +92,13 @@ int renamer::free_list_regs_available(){
     if (this->free_list_is_full()) return this->free_list_size;
     if (this->free_list_is_empty()) return 0;
     
+    uint64_t available = UINT64_MAX;
     if (this->fl.head_phase != this->fl.tail_phase){
         //otherwise inconsistent state: tail cannot be ahead of head,
         //means you are inserting entry when the list is already full
         assert(this->fl.head > this->fl.tail);
-        return this->fl.tail - this->fl.head + this->free_list_size;
+        available = this->fl.tail - this->fl.head + this->free_list_size;
+        return available;
     }
 
     if (this->fl.head_phase == this->fl.tail_phase){
@@ -105,11 +106,12 @@ int renamer::free_list_regs_available(){
         // it allocated registers it does not have
         assert(this->fl.head < this->fl.tail);
         //available regsiters
-        return this->fl.tail - this->fl.head;
+        available = this->fl.tail - this->fl.head;
+        return available;
     }
 
 
-    return -1; //it should never come here bc of the assertions 
+    return available; //it should never come here bc of the assertions 
 }
 
 bool renamer::stall_reg(uint64_t bundle_dst){
@@ -118,8 +120,8 @@ bool renamer::stall_reg(uint64_t bundle_dst){
     //if the number of available registers are less than
     //the input return false, otherwise return true
 
-    int available_physical_regs = this->free_list_regs_available();
-    if (available_physical_regs == -1) {
+    uint64_t available_physical_regs = this->free_list_regs_available();
+    if (available_physical_regs == UINT64_MAX) {
 /*
         printf("Free List: head %d, tail %d, head_phase %d, tail_phase %d\n",
             fl.head, fl.tail, fl.head_phase, fl.tail_phase
