@@ -696,6 +696,7 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
         // * Restore the Active List tail pointer and its phase bit
         //   corresponding to the entry after the branch's entry.
         int recoverd_al_tail = AL_index + 1;
+        assert(al.head != recoverd_al_tail);
         this->al.tail = recoverd_al_tail;
         // AL cannot be empty, so it has to be partially full or completely
         // full.
@@ -729,7 +730,10 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
             this->al.tail_phase = this->al.head_phase;
         }
 
-
+        //when the corner case of tail being at the end FIXME experimental
+        if (recoverd_al_tail == this->active_list_size){
+            this->al.tail_phase = !this->al.tail_phase;
+        }
     }
 }
 
