@@ -635,9 +635,7 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
         this->checkpoints[branch_ID].__in_use = false; 
 
     } else {
-        //FIXME: Not Implemented
-        printf("resolve():: Branch Mispredict recovery Not Implemented\n");
-        return;
+        //FIXME: Initial implementation, double check
         // In the case of a misprediction:
         // * Restore the GBM from the branch's checkpoint. Also make sure the
         //   mispredicted branch's bit is cleared in the restored GBM,
