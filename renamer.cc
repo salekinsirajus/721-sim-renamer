@@ -86,32 +86,7 @@ renamer::renamer(uint64_t n_log_regs,
     printf("----------Initial Free List---------------\n");
     print_free_list();
     printf("--------End Initial Free List-------------\n");
-}
 
-int renamer::free_list_regs_available(){
-    if (this->free_list_is_full()) return this->free_list_size;
-    if (this->free_list_is_empty()) return 0;
-    
-    uint64_t available = UINT64_MAX;
-    if (this->fl.head_phase != this->fl.tail_phase){
-        //otherwise inconsistent state: tail cannot be ahead of head,
-        //means you are inserting entry when the list is already full
-        assert(this->fl.head > this->fl.tail);
-        available = this->fl.tail - this->fl.head + this->free_list_size;
-        return available;
-    }
-
-    if (this->fl.head_phase == this->fl.tail_phase){
-        //otherwise inconsistent state: head cant be ahead of tail, means
-        // it allocated registers it does not have
-        assert(this->fl.head < this->fl.tail);
-        //available regsiters
-        available = this->fl.tail - this->fl.head;
-        return available;
-    }
-
-
-    return available; //it should never come here bc of the assertions 
 }
 
 bool renamer::stall_reg(uint64_t bundle_dst){
@@ -144,10 +119,7 @@ bool renamer::stall_reg(uint64_t bundle_dst){
 uint64_t renamer::rename_rsrc(uint64_t log_reg){
     //read off of RMT. This provides the current mapping
     //TODO: double check this is how the src reg renaming works
-/*
-    printf("renamer::rename_rsrc(%d) = %d\n", log_reg, this->rmt[log_reg]);
-    printf("renamer::rename_rsrc(%d) = amt[%d], rmt[%d]\n", log_reg, this->amt[log_reg], this->rmt[log_reg]);
-*/
+    //printf("renamer::rename_rsrc(r%llu) = p%llu, prf[%llu]\n", log_reg, this->rmt[log_reg], this->prf[this->rmt[log_reg]]);
     return this->rmt[log_reg]; 
 }
 
@@ -174,9 +146,11 @@ void renamer::restore_free_list(){
 
 bool renamer::push_free_list(uint64_t phys_reg){
     //if it's full, you cannot push more into it
+    //printf("push():: attempted p%llu into the free list\n", phys_reg);
     if (this->free_list_is_full()){
         return false;
     }
+    //printf("BEFOR PUSH\n");
 /*
     printf("push_free_list(): pushing prf[%llu]   to the free list\n", phys_reg);
 */
@@ -190,6 +164,10 @@ bool renamer::push_free_list(uint64_t phys_reg){
 /*
     printf("FREELIST: Free register count after PUSH: %d\n", this->free_list_regs_available());
  */ 
+    //printf("push():: pushed p%llu into the free list\n", phys_reg);
+    //printf("AFTER PUSH\n");
+    //print_free_list();
+    assert_free_list_invariance();
     return true; 
 }
 
@@ -198,6 +176,9 @@ uint64_t renamer::pop_free_list(){
     if (this->free_list_is_empty()){
         return UINT64_MAX;
     }
+
+    //printf("BEFOR POP\n");
+    //print_free_list();
 
     uint64_t result;
     result = this->fl.list[this->fl.head];
@@ -214,9 +195,49 @@ uint64_t renamer::pop_free_list(){
 /*
     printf("FREELIST: Free register count after POP : %d\n", this->free_list_regs_available());
 */
+    //printf("pop():: popped p%llu from the free list\n", result);
+    //printf("AFTER POP\n");
+    //print_free_list();
+    assert_free_list_invariance();
     return result;
 
 }
+
+void renamer::assert_free_list_invariance(){
+    if (this->fl.head_phase != this->fl.tail_phase){
+        assert(!(this->fl.head < this->fl.tail));
+    }
+    if (this->fl.head_phase == this->fl.tail_phase){
+        assert(!(this->fl.head > this->fl.tail));
+    }
+}
+
+int renamer::free_list_regs_available(){
+    if (this->free_list_is_full()) return this->free_list_size;
+    if (this->free_list_is_empty()) return 0;
+    
+    uint64_t available = UINT64_MAX;
+    if (this->fl.head_phase != this->fl.tail_phase){
+        //otherwise inconsistent state: tail cannot be ahead of head,
+        //means you are inserting entry when the list is already full
+        assert(this->fl.head > this->fl.tail);
+        available = this->fl.tail - this->fl.head + this->free_list_size;
+        return available;
+    }
+
+    if (this->fl.head_phase == this->fl.tail_phase){
+        //otherwise inconsistent state: head cant be ahead of tail, means
+        // it allocated registers it does not have
+        assert(this->fl.head < this->fl.tail);
+        //available regsiters
+        available = this->fl.tail - this->fl.head;
+        return available;
+    }
+
+
+    return available; //it should never come here bc of the assertions 
+}
+
 uint64_t renamer::rename_rdst(uint64_t log_reg){
     //phys. dest. reg. = pop new mapping from free list
     //RMT[logical dest. reg.] = phys. dest. reg.
@@ -224,15 +245,33 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
     printf("renamer::rename_rdst() called\n");
 */
 
+    uint64_t old = this->rmt[log_reg];
+    //printf("renamer::rename_rdst(r%llu) = p%llu, prf[%llu]\n", log_reg, this->rmt[log_reg], this->prf[this->rmt[log_reg]]);
     uint64_t result = this->pop_free_list();
     if (result == UINT64_MAX){
         printf("FATAL ERROR: rename_rdst - not enough free list entry\n");
         exit(EXIT_FAILURE);
     } else {
         //update RMT
+        if (this->reg_in_rmt(result)){
+            printf("%llu (popped from freelist) is already in RMT\n", result);
+            print_rmt();
+            print_free_list();
+            print_active_list(true);
+            exit(EXIT_FAILURE);
+        }
         this->rmt[log_reg] = result; 
     }
    
+    assert(old != this->rmt[log_reg]);
+    //assert(!this->reg_in_amt(result));
+    if (this->reg_in_amt(result)){
+            printf("%llu (popped from freelist) is already in AMT\n", result);
+            print_amt();
+            print_free_list();
+            print_active_list(true);
+            exit(EXIT_FAILURE);
+    }
     //FIXME: what happens to the old mapping?????
 /*
     printf("renamer::rename_rdst(%d) = amt r%d[%d], rmt r%d[%d]\n", log_reg, log_reg, this->amt[log_reg], log_reg, this->rmt[log_reg]);
@@ -576,6 +615,7 @@ void renamer::commit(){
         //printf("commit(): new mapping at AMT: %d\n", this->amt[al_head->logical]);
 
         op = this->push_free_list(old_mapping);
+
         if (op == false){
             printf("FATAL ERROR: tried to push when the free list is full\n");
             exit(EXIT_FAILURE);
@@ -604,27 +644,20 @@ bool renamer::retire_from_active_list(){
 
     //TODO: updating other structures like AMT, RMT, Free list, Shadow Map Table?
     //advance head pointer of the Active List
-    ////printf("printing active list before increamenting the head pointer\n");
-    ////this->print_active_list(0);
     this->al.head++;
-    this->al.list[al.head]._retired = true;
     if (this->al.head == this->active_list_size){
         //wrap around
         this->al.head = 0;
         this->al.head_phase = !this->al.head_phase;
     }
-    ////printf("printing active list after increamenting the head pointer\n");
-    ////this->print_active_list(0);
-    ////this->print_rmt();
-    ////this->print_amt();
     
     return true;
 }
 
 void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
-/*
-    printf("renamer::resolve() is called\n");
-*/
+
+    //printf("renamer::resolve() is called\n");
+
     if (correct){ //branch was predicted correctly
         //clear the GBM bit by indexing with branch_ID
         this->GBM  &= ~(1ULL<<branch_ID);
@@ -722,9 +755,9 @@ void renamer::squash(){
     }
     
     //What else is involved in squashing a renamer with AMT+RMT?
-/*
+
     printf("squash gets called. Not Implemented\n");
-*/  
+
     return;
 }
 
@@ -809,7 +842,6 @@ void renamer::init_al_entry(al_entry_t *ale){
     ale->is_amo=false;
     ale->is_csr=false;
     ale->pc=UINT64_MAX;
-    ale->_retired=false;
 }
 
 
@@ -818,13 +850,19 @@ void renamer::print_free_list(){
     uint64_t i=0;
     printf("--------------FREE LIST-------------------\n");
     while (i < free_list_size){
-        if (i == fl.tail) printf("|%llu T(%d)", fl.list[i], fl.tail, fl.tail_phase);
-        if (i == fl.head) printf("|%llu H(%d)", fl.list[i], fl.head, fl.head_phase);
-        if (i != fl.head && i != fl.tail) printf("|%3llu ", fl.list[i]);
+        /*
+        if (i == fl.tail) printf("|%lluT(%d)", fl.list[i], fl.tail_phase);
+        else if (i == fl.head) printf("|%lluH(%d)", fl.list[i], fl.head_phase);
+        else if (i == fl.head && i == fl.tail) printf("|%lluH%dT%d", fl.head_phase, fl.tail_phase);
+        else if (i != fl.head && i != fl.tail) 
+        */
+        printf("| %3llu ", fl.list[i]);
         i++;
     }
     printf("|\n");
     printf("------------END FREE LIST-----------------\n");
+    printf("FL: tail: %d, tail_phase:%d, head: %d, head_phase: %d\n", 
+            fl.tail, fl.tail_phase, fl.head, fl.head_phase);
 }
 void renamer::print_amt(){
     printf("---------------------AMT-----------------\n");
@@ -873,12 +911,28 @@ void renamer::print_active_list(bool between_head_and_tail){
     for (i; i < n; i++){
         al_entry_t *t;
         t = &this->al.list[i];
-        printf("| %3d | %3d | %3d | %3d | %3d | %3d| %llu | %3d|\n",
+        printf("| %3d | %3d | %3d | %3d | %3d | %3d| %llu |\n",
                 i,     t->logical, t->physical, t->completed,
-                t->exception, t->has_dest, t->pc, t->_retired);
+                t->exception, t->has_dest, t->pc);
     }
     printf("AL Head: %d, AL tail: %d, Head Phase: %d, Tail Phase: %d\n",
             this->al.head, this->al.tail, this->al.head_phase, this->al.tail_phase
         );
 
+}
+
+bool renamer::reg_in_amt(uint64_t phys_reg){
+    uint64_t i;
+    for (i=0; i < this->map_table_size; i++){
+        if (this->amt[i] == phys_reg) return true;    
+    }
+    return false;
+}
+
+bool renamer::reg_in_rmt(uint64_t phys_reg){
+    uint64_t i;
+    for (i=0; i < this->map_table_size; i++){
+        if (this->rmt[i] == phys_reg) return true;    
+    }
+    return false;
 }

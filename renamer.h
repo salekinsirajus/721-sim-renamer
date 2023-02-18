@@ -101,7 +101,6 @@ private:
         bool             is_amo;
         bool             is_csr;
         uint64_t             pc;
-        bool           _retired; //this is a bogus field, only for testing
     } al_entry;
 
     typedef struct active_list_t {
@@ -575,10 +574,14 @@ public:
     uint64_t pop_free_list();
     int free_list_regs_available();
     void restore_free_list();
+
     void print_free_list();
     void print_amt();
     void print_rmt();
     void print_prf();
     void print_prf_ready();
     void print_active_list(bool between_head_and_tail);
+    bool reg_in_amt(uint64_t);
+    bool reg_in_rmt(uint64_t);
+    void assert_free_list_invariance(); 
 };
