@@ -384,7 +384,7 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
 bool renamer::stall_dispatch(uint64_t bundle_dst){
     //Assert Active List is not full
     //printf("stall_dispatch():\n");
-    int available_al_entry = this->get_free_al_entry_count();
+    uint64_t available_al_entry = this->get_free_al_entry_count();
     //printf("stall_dispatch(): free AL entry: %d\n", available_al_entry);
     if (this->active_list_is_full()){
     //    printf("stall_dispatch(): Active List is full, stalling dispatch\n");
@@ -471,11 +471,11 @@ bool renamer::stall_branch(uint64_t bundle_branch){
     //simple use case, all taken, DO STALL
     if (gbm == UINT64_MAX) return true;
 
-    int free_count=0;
-    int n = num_checkpoints;
+    uint64_t free_count=0;
+    uint64_t n = num_checkpoints;
     uint64_t mask = 1;
     
-    int i;
+    uint64_t i;
     for (i=0; i<n; i++){
         if (gbm & mask){
             mask <<= 1;
