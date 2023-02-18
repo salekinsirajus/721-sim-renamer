@@ -130,11 +130,11 @@ bool renamer::stall_reg(uint64_t bundle_dst){
     }
 
     if (available_physical_regs < bundle_dst){
-        printf("renamer::stall_reg() return true\n");
+    //    printf("renamer::stall_reg() return true\n");
         return true;
     }
     
-    printf("renamer::stall_reg() return false\n");
+    //printf("renamer::stall_reg() return false\n");
     return false;
 }
 
@@ -279,10 +279,10 @@ uint64_t renamer::checkpoint(){
     //  2. Shadow Map Table (checkpointed RMT)
     cp temp;
     // SMT: copying over the AMT content
-    temp.shadow_map_table = new int[this->shadow_map_table_size];
+    temp.shadow_map_table = new uint64_t[this->shadow_map_table_size];
     int i;
     for (i=0; i<this->shadow_map_table_size; i++){
-        temp.shadow_map_table[i] = this->amt[i];
+        temp.shadow_map_table[i] = this->rmt[i];
     }
     // SMT: head and head phase
     temp.free_list_head = this->fl.head;
@@ -637,6 +637,66 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
     } else {
         //FIXME: Not Implemented
         printf("resolve():: Branch Mispredict recovery Not Implemented\n");
+        return;
+        // In the case of a misprediction:
+        // * Restore the GBM from the branch's checkpoint. Also make sure the
+        //   mispredicted branch's bit is cleared in the restored GBM,
+        //   since it is now resolved and its bit and checkpoint are freed.
+        // * You don't have to worry about explicitly freeing the GBM bits
+        //   and checkpoints of branches that are after the mispredicted
+        //   branch in program order. The mere act of restoring the GBM
+        //   from the checkpoint achieves this feat.
+        uint64_t misp_gbm = this->checkpoints[branch_ID].gbm;
+        misp_gbm  &= ~(1ULL<<branch_ID);
+        this->GBM = misp_gbm;
+
+        // * Restore the RMT using the branch's checkpoint.
+        int i;
+        for (i=0; i < map_table_size; i++){
+            this->rmt[i] = this->checkpoints[branch_ID].shadow_map_table[i]; 
+        }
+        // * Restore the Free List head pointer and its phase bit,
+        //   using the branch's checkpoint.
+        this->fl.head = this->checkpoints[branch_ID].free_list_head;
+        this->fl.head_phase =this->checkpoints[branch_ID].free_list_head_phase;
+
+        // * Restore the Active List tail pointer and its phase bit
+        //   corresponding to the entry after the branch's entry.
+        int recoverd_al_tail = AL_index + 1;
+        this->al.tail = recoverd_al_tail;
+        // AL cannot be empty, so it has to be partially full or completely
+        // full.
+        if (recoverd_al_tail == this->active_list_size){
+            this->al.tail = 0;
+        }
+
+        //   Hints:
+        //   You can infer the restored tail pointer from the branch's
+        //   AL_index. You can infer the restored phase bit, using
+        //   the phase bit of the Active List head pointer, where
+        //   the restored Active List tail pointer is with respect to
+        //   the Active List head pointer, and the knowledge that the
+        //   Active List can't be empty at this moment (because the
+        //   mispredicted branch is still in the Active List).
+        // * Do NOT set the branch misprediction bit in the Active List.
+        //   (Doing so would cause a second, full squash when the branch
+        //   reaches the head of the Active List. We don’t want or need
+        //   that because we immediately recover within this function.)
+
+        // if hp == tp and h == t empty - not possible
+        //    hp != tp and h == t full  - possible
+        //    hp == tp     h  < t partly filled - possible
+        //    hp != tp     h  > t possible 
+        if (this->al.head == this->al.tail){
+            this->al.tail_phase = !this->al.head_phase;
+        }
+        else if (this->al.head > this->al.tail){
+            this->al.tail_phase = !this->al.head_phase;
+        } else { // h < t, 
+            this->al.tail_phase = this->al.head_phase;
+        }
+
+
     }
 }
 

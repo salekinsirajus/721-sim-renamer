@@ -180,7 +180,7 @@ private:
     // 3. checkpointed GBM
     /////////////////////////////////////////////////////////////////////
     typedef struct checkpoint_t{
-        int *shadow_map_table; 
+        uint64_t *shadow_map_table; 
         int free_list_head;
         int free_list_head_phase;
         int gbm;
