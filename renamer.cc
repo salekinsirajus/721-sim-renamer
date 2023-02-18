@@ -366,10 +366,6 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
     active_list_entry->pc = PC;
     //saving the index to return at the end of the function
 
-    printf("After insert_into_active_list() in dispatch_inst: printing active list\n");
-    print_active_list(true);
-    
-
     return idx_at_al;
 }
 
