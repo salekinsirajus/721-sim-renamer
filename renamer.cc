@@ -12,7 +12,6 @@ renamer::renamer(uint64_t n_log_regs,
     
     //Run the assertions
     assert(n_phys_regs > n_log_regs);
-    //TODO: fix the machinary that sets the number of checkpoints to be flexible
     assert((1 <= n_branches) && (n_branches <= 64));
     assert(n_active > 0);
   
@@ -75,7 +74,7 @@ renamer::renamer(uint64_t n_log_regs,
     //how many different checkpoint entrys? 
     //should we keep this in a container?   
     GBM = 0;
-    num_checkpoints = sizeof(uint64_t)*8;
+    num_checkpoints = n_branches;
     checkpoints = new checkpoint_t[num_checkpoints];
 
 
@@ -287,7 +286,8 @@ int renamer::allocate_gbm_bit(){
     uint64_t gbm = this->GBM;
     if (gbm == UINT64_MAX) return -1;
     
-    int i, n = sizeof(this->GBM) * 8;
+    int i;
+    int n = this->num_checkpoints;
     uint64_t mask = 1;
 
     for (i=0; i < n; i++){
@@ -666,8 +666,6 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
         for (i=0; i < this->num_checkpoints; i++){
             this->checkpoints[i].gbm &= ~(1ULL<<branch_ID);
         } 
-        //TODO: (verify) resetting the in_use to false
-        this->checkpoints[branch_ID].__in_use = false; 
 
     } else {
         //FIXME: Initial implementation, double check
@@ -685,7 +683,7 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
 
         // * Restore the RMT using the branch's checkpoint.
         int i;
-        for (i=0; i < map_table_size; i++){
+        for (i=0; i < shadow_map_table_size; i++){
             this->rmt[i] = this->checkpoints[branch_ID].shadow_map_table[i]; 
         }
         // * Restore the Free List head pointer and its phase bit,
@@ -695,11 +693,10 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
 
         // * Restore the Active List tail pointer and its phase bit
         //   corresponding to the entry after the branch's entry.
-        int recoverd_al_tail = AL_index + 1;
-        this->al.tail = recoverd_al_tail;
+        this->al.tail = AL_index + 1;
         // AL cannot be empty, so it has to be partially full or completely
         // full.
-        if (recoverd_al_tail == this->active_list_size){
+        if (this->al.tail == this->active_list_size){
             this->al.tail = 0;
         }
 

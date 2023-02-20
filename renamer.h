@@ -584,4 +584,5 @@ public:
     bool reg_in_amt(uint64_t);
     bool reg_in_rmt(uint64_t);
     void assert_free_list_invariance(); 
+    void assert_active_list_invariance();
 };
