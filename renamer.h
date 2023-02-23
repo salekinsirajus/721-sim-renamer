@@ -183,7 +183,6 @@ private:
         int free_list_head;
         int free_list_head_phase;
         int gbm;
-        bool __in_use;  //secret variable
     }cp;
 
     int shadow_map_table_size;
