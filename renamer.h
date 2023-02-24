@@ -20,7 +20,7 @@ private:
     /////////////////////////////////////////////////////////////////////
     uint64_t *amt;
 
-    int map_table_size; //AMT and RMT size
+    uint64_t map_table_size; //AMT and RMT size
     /////////////////////////////////////////////////////////////////////
     // Structure 3: Free List
     //
@@ -34,19 +34,13 @@ private:
     //  - add newly freed entry at the tail, move tail pointer at retire
     /////////////////////////////////////////////////////////////////////
     typedef struct free_list_t{
-        int head, head_phase;
-        int tail, tail_phase;
+        uint64_t head, head_phase;
+        uint64_t tail, tail_phase;
         uint64_t *list;
     } free_list;
 
-    int free_list_size;    
+    uint64_t free_list_size;    
     free_list fl; 
-    /* How to use:
-        fl.head = 0;
-        fl.list = new int[free_list_size];  //user input free_list_size
-        fl.head = 0; 
-        fl.list[1] = 20; 
-    */
 
     /////////////////////////////////////////////////////////////////////
     // Structure 4: Active List
@@ -104,13 +98,13 @@ private:
     } al_entry;
 
     typedef struct active_list_t {
-        int head, head_phase;
-        int tail, tail_phase;
+        uint64_t head, head_phase;
+        uint64_t tail, tail_phase;
         al_entry_t *list;
     }active_list;
     //TODO: verify this works
     active_list al;
-    int active_list_size;
+    uint64_t active_list_size;
 
 
     /////////////////////////////////////////////////////////////////////
@@ -129,7 +123,7 @@ private:
     /////////////////////////////////////////////////////////////////////
     uint64_t *prf_ready;
 
-    int num_phys_reg;
+    uint64_t num_phys_reg;
 
     /////////////////////////////////////////////////////////////////////
     // Structure 7: Global Branch Mask (GBM)
@@ -179,15 +173,14 @@ private:
     // 3. checkpointed GBM
     /////////////////////////////////////////////////////////////////////
     typedef struct checkpoint_t{
-        int *shadow_map_table; 
-        int free_list_head;
-        int free_list_head_phase;
-        int gbm;
-        bool __in_use;  //secret variable
+        uint64_t *shadow_map_table; 
+        uint64_t free_list_head;
+        uint64_t free_list_head_phase;
+        uint64_t gbm;
     }cp;
 
-    int shadow_map_table_size;
-    int num_checkpoints;
+    uint64_t shadow_map_table_size;
+    uint64_t num_checkpoints;
 
     checkpoint_t *checkpoints;
 
@@ -195,8 +188,36 @@ private:
     // Private functions.
     // e.g., a generic function to copy state from one map to another.
     /////////////////////////////////////////////////////////////////////
-    int allocate_gbm_bit();
+    uint64_t allocate_gbm_bit();
     void init_al_entry(al_entry_t *ale);
+    //////////////////////////////////////////
+    // Helper functions later implemented  .//
+    //////////////////////////////////////////
+    int get_free_al_entry_count();
+    bool active_list_is_empty();
+    bool active_list_is_full();
+    uint64_t insert_into_active_list();
+    bool retire_from_active_list();
+
+    bool free_list_is_empty();
+    bool free_list_is_full();
+    bool push_free_list(uint64_t phys_reg);
+    uint64_t pop_free_list();
+    int free_list_regs_available();
+    void restore_free_list();
+
+    /*
+    void print_free_list();
+    void print_amt();
+    void print_rmt();
+    void print_prf();
+    void print_prf_ready();
+    void print_active_list(bool between_head_and_tail);
+    */
+    bool reg_in_amt(uint64_t);
+    bool reg_in_rmt(uint64_t);
+    void assert_free_list_invariance(); 
+    void assert_active_list_invariance();
 
 public:
     ////////////////////////////////////////
@@ -558,19 +579,4 @@ public:
     /////////////////////////////////////////////////////////////////////
     bool get_exception(uint64_t AL_index);
 
-    //////////////////////////////////////////
-    // Helper functions later implemented  .//
-    //////////////////////////////////////////
-    int get_free_al_entry_count();
-    bool active_list_is_empty();
-    bool active_list_is_full();
-    uint64_t insert_into_active_list();
-    bool retire_from_active_list();
-
-    bool free_list_is_empty();
-    bool free_list_is_full();
-    bool push_free_list(uint64_t phys_reg);
-    uint64_t pop_free_list();
-    int free_list_regs_available();
-    void restore_free_list();
 };
