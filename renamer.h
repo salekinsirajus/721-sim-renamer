@@ -190,9 +190,35 @@ private:
     /////////////////////////////////////////////////////////////////////
     uint64_t allocate_gbm_bit();
     void init_al_entry(al_entry_t *ale);
+    //////////////////////////////////////////
+    // Helper functions later implemented  .//
+    //////////////////////////////////////////
+    int get_free_al_entry_count();
+    bool active_list_is_empty();
+    bool active_list_is_full();
+    uint64_t insert_into_active_list();
+    bool retire_from_active_list();
 
-    int retired_insn;
-    int dbg_pt;
+    bool free_list_is_empty();
+    bool free_list_is_full();
+    bool push_free_list(uint64_t phys_reg);
+    uint64_t pop_free_list();
+    int free_list_regs_available();
+    void restore_free_list();
+
+    /*
+    void print_free_list();
+    void print_amt();
+    void print_rmt();
+    void print_prf();
+    void print_prf_ready();
+    void print_active_list(bool between_head_and_tail);
+    */
+    bool reg_in_amt(uint64_t);
+    bool reg_in_rmt(uint64_t);
+    void assert_free_list_invariance(); 
+    void assert_active_list_invariance();
+
 public:
     ////////////////////////////////////////
     // Public functions.
@@ -553,32 +579,4 @@ public:
     /////////////////////////////////////////////////////////////////////
     bool get_exception(uint64_t AL_index);
 
-    //////////////////////////////////////////
-    // Helper functions later implemented  .//
-    //////////////////////////////////////////
-    int get_free_al_entry_count();
-    bool active_list_is_empty();
-    bool active_list_is_full();
-    uint64_t insert_into_active_list();
-    bool retire_from_active_list();
-
-    bool free_list_is_empty();
-    bool free_list_is_full();
-    bool push_free_list(uint64_t phys_reg);
-    uint64_t pop_free_list();
-    int free_list_regs_available();
-    void restore_free_list();
-
-    /*
-    void print_free_list();
-    void print_amt();
-    void print_rmt();
-    void print_prf();
-    void print_prf_ready();
-    void print_active_list(bool between_head_and_tail);
-    */
-    bool reg_in_amt(uint64_t);
-    bool reg_in_rmt(uint64_t);
-    void assert_free_list_invariance(); 
-    void assert_active_list_invariance();
 };

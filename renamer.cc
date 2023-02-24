@@ -7,9 +7,6 @@ renamer::renamer(uint64_t n_log_regs,
         uint64_t n_phys_regs,
         uint64_t n_branches,
         uint64_t n_active){
-
-    retired_insn = 0; //FIXME: delete this once you are done
-    dbg_pt = 0;
     
     //Run the assertions
     assert(n_phys_regs > n_log_regs);
@@ -51,7 +48,7 @@ renamer::renamer(uint64_t n_log_regs,
     assert(active_list_is_empty());
 
     for (j=0; j<n_active; j++){
-        //init_al_entry(&al.list[j]);
+        init_al_entry(&al.list[j]);
     }
     
     //free list; free_list_size = prf - n_log_regs (721ss-prf-2 slide, p19)
@@ -110,8 +107,6 @@ bool renamer::free_list_is_full(){
 }
 
 void renamer::restore_free_list(){
-    //TODO/FIXME: test this works
-    //restore free list
     this->fl.head = this->fl.tail;
     this->fl.head_phase = !this->fl.tail_phase;
 }
@@ -134,7 +129,6 @@ bool renamer::push_free_list(uint64_t phys_reg){
 }
 
 uint64_t renamer::pop_free_list(){
-    //TODO: if free list is empty do not return anything
     if (this->free_list_is_empty()){
         return UINT64_MAX;
     }
@@ -251,19 +245,16 @@ uint64_t renamer::allocate_gbm_bit(){
 uint64_t renamer::get_branch_mask(){
     //An instruction's initial branch mask is the value of the
     //the GBM when the instruction is renamed.
-    //FIXME: potential load assertion error candidate
-    
+
     return this->GBM;
 }
 
 
 uint64_t renamer::checkpoint(){
-    //printf("%d: checkpoint()\n", retired_insn);
     //create a new branch checkpoint
     //allocate:
     //  1. GMB bit: starting from left or right? which way does this move? 
     //  2. Shadow Map Table (checkpointed RMT)
-    //FIXME: is this where the new checkpoint should go?
     uint64_t gbm_bit = this->allocate_gbm_bit();
     if ((gbm_bit < 0) | (gbm_bit > this->num_checkpoints)){
         printf("This should not happen. Could not allocate checkpoint, should stall\n");
@@ -340,11 +331,14 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
         active_list_entry->physical = UINT64_MAX;
     }
 
-    active_list_entry->completed = false; //just dispatched
-    active_list_entry->exception = false; //just dispatched
+    //the following flags should be false since they are just dispatched
+    active_list_entry->completed = false;
+    active_list_entry->exception = false;
     active_list_entry->br_mispredict = false;
     active_list_entry->val_mispredict = false;
     active_list_entry->load_violation = false;
+
+    //whatever was passed to this function
     active_list_entry->is_load = load;
     active_list_entry->is_store = store;
     active_list_entry->is_branch = branch;
@@ -363,7 +357,6 @@ bool renamer::stall_dispatch(uint64_t bundle_dst){
         return true;
     }
    
-    //WIP: find how many entries are available in the Active List  
     if ((available_al_entry < bundle_dst) || (available_al_entry <= 0)){
         return true;
     }
@@ -459,8 +452,6 @@ void renamer::commit(){
     assert(al_head->completed == true);
     assert(al_head->exception == false);
     assert(al_head->load_violation == false);
-    //if (al_head->load_violation == true) printf("%lu: commit(): load_violation detected\n", al_head->pc);
-    //printf("%d: commit(): load_vio: %d\n", retired_insn, al_head->load_violation);
 
     //commit the instruction at the head of the active list
     //find the physical dst register by looking up the AMT with logical reg
@@ -479,26 +470,20 @@ void renamer::commit(){
         }
     }
 
-    //TODO: update other structures like AMT, RMT, Free list, Shadow Map Table?
     op = this->retire_from_active_list();
     if (op == false){
         printf("FATAL ERROR: could not retire from AL since its empty\n");
         exit(EXIT_FAILURE);
     }
 
-    retired_insn++;
-
     return;
 }
 
 bool renamer::retire_from_active_list(){
-    //TODO: if free list is empty do not return anything
     if (this->active_list_is_empty()){
         return false;
     }
 
-    //TODO: updating other structures like AMT, RMT, Free list, Shadow Map Table?
-    //advance head pointer of the Active List
     this->al.head++;
     if (this->al.head == this->active_list_size){
         //wrap around
@@ -510,7 +495,6 @@ bool renamer::retire_from_active_list(){
 }
 
 void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
-    //printf("%d: resolve(correct %d)\n", retired_insn, correct);
     if (correct){ //branch was predicted correctly
         //clear the GBM bit by indexing with branch_ID
         this->GBM  &= ~(1ULL<<branch_ID);
@@ -521,15 +505,10 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
         } 
 
     } else {
-        //FIXME: Initial implementation, double check
         // In the case of a misprediction:
         // * Restore the GBM from the branch's checkpoint. Also make sure the
         //   mispredicted branch's bit is cleared in the restored GBM,
         //   since it is now resolved and its bit and checkpoint are freed.
-        // * You don't have to worry about explicitly freeing the GBM bits
-        //   and checkpoints of branches that are after the mispredicted
-        //   branch in program order. The mere act of restoring the GBM
-        //   from the checkpoint achieves this feat.
         uint64_t misp_gbm = this->checkpoints[branch_ID].gbm;
         misp_gbm  &= ~(1ULL<<branch_ID);
         this->GBM = misp_gbm;
@@ -546,23 +525,13 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
 
         // * Restore the Active List tail pointer and its phase bit
         //   corresponding to the entry after the branch's entry.
-        //if (this->active_list_is_full()) printf("We are running into the AL full edge case\n");
         this->al.tail = AL_index + 1;
-        // AL cannot be empty, so it has to be partially full or completely
-        // full.
+        // AL cannot be empty, so it has to be partially or completely full.
         if (this->al.tail == this->active_list_size){
             this->al.tail = 0;
         }
 
-        //   Hints:
-        //   You can infer the restored tail pointer from the branch's
-        //   AL_index. You can infer the restored phase bit, using
-        //   the phase bit of the Active List head pointer, where
-        //   the restored Active List tail pointer is with respect to
-        //   the Active List head pointer, and the knowledge that the
-        //   Active List can't be empty at this moment (because the
-        //   mispredicted branch is still in the Active List).
-
+        // Inferring tail phase from head and tail pointers, w/ following logic
         // if hp == tp and h == t empty - not possible
         //    hp != tp and h == t full  - possible
         //    hp == tp     h  < t partly filled - possible
@@ -571,19 +540,18 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
         if (al.head  > al.tail) al.tail_phase = !al.head_phase;
         if (al.head  < al.tail) al.tail_phase =  al.head_phase;
 
+        //Make sure the restoration is correct
         this->assert_active_list_invariance();
     }
 }
 
 
 void renamer::squash(){
-    //printf("%lu: squash()\n", this->al.list[this->al.head].pc);
     //the renamer should be rolled back to the committed state of the machine
-    //empty out the active list
     uint64_t i;
     this->al.tail = this->al.head;
     this->al.tail_phase = this->al.head_phase;
-    //clear out AL contents?
+    //empty out the active list, clear out AL contents.
     for (i=0; i < active_list_size; i++){
         init_al_entry(&al.list[i]);
     }
@@ -595,8 +563,7 @@ void renamer::squash(){
         rmt[i] = amt[i];
     }
     
-    //What else is involved in squashing a renamer with AMT+RMT?
-    //IF GBM contiains only speculative branch checkpoints, then set it 0
+    //Clear the checkpoints
     this->GBM = 0;
     for (i=0; i<num_checkpoints; i++){
         this->checkpoints[i].free_list_head = 0;
