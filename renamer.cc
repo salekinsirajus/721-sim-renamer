@@ -9,6 +9,7 @@ renamer::renamer(uint64_t n_log_regs,
         uint64_t n_active){
 
     retired_insn = 0; //FIXME: delete this once you are done
+    dbg_pt = 0;
     
     //Run the assertions
     assert(n_phys_regs > n_log_regs);
@@ -50,7 +51,7 @@ renamer::renamer(uint64_t n_log_regs,
     assert(active_list_is_empty());
 
     for (j=0; j<n_active; j++){
-        init_al_entry(&al.list[j]);
+        //init_al_entry(&al.list[j]);
     }
     
     //free list; free_list_size = prf - n_log_regs (721ss-prf-2 slide, p19)
@@ -64,7 +65,7 @@ renamer::renamer(uint64_t n_log_regs,
 
     //Free list contains registers that are not allocated or committed
     //i.e. registers that are not in AMT or RMT.
-    int i;
+    uint64_t i;
     for (i=0; i <free_list_size; i++){
         fl.list[i] = n_log_regs + i;
     }
@@ -73,16 +74,6 @@ renamer::renamer(uint64_t n_log_regs,
     GBM = 0;
     num_checkpoints = n_branches;
     checkpoints = new checkpoint_t[num_checkpoints];
-
-    /*
-    printf("----------Initial AMT and RMT-----------\n");
-    print_amt();
-    print_rmt();
-    printf("----------End Initial AMT and RMT-----------\n");
-    printf("----------Initial Free List---------------\n");
-    print_free_list();
-    printf("--------End Initial Free List-------------\n");
-    */
 }
 
 bool renamer::stall_reg(uint64_t bundle_dst){
@@ -218,10 +209,7 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
     } else {
         //update RMT //TODO: see if it's in AMT
         if (this->reg_in_rmt(result)){
-            printf("%llu (popped from freelist) is already in RMT\n", result);
-            print_rmt();
-            print_free_list();
-            print_active_list(true);
+            printf("%lu (popped from freelist) is already in RMT\n", result);
             exit(EXIT_FAILURE);
         }
 
@@ -231,25 +219,22 @@ uint64_t renamer::rename_rdst(uint64_t log_reg){
    
     assert(old != this->rmt[log_reg]);
     if (this->reg_in_amt(result)){
-            printf("%llu (popped from freelist) is already in AMT\n", result);
-            print_amt();
-            print_free_list();
-            print_active_list(true);
+            printf("%lu (popped from freelist) is already in AMT\n", result);
             exit(EXIT_FAILURE);
     }
 
     return result;
 }
 
-int renamer::allocate_gbm_bit(){
+uint64_t renamer::allocate_gbm_bit(){
     //NOTE: Allocate free bit from left to right, so if i<j and both of bits
     //      are zero, it will return i
 
     uint64_t gbm = this->GBM;
     if (gbm == UINT64_MAX) return -1;
     
-    int i;
-    int n = this->num_checkpoints;
+    uint64_t i;
+    uint64_t n = this->num_checkpoints;
     uint64_t mask = 1;
 
     for (i=0; i < n; i++){
@@ -260,7 +245,7 @@ int renamer::allocate_gbm_bit(){
         }
     }
 
-    return -1; //No free bit found
+    return UINT64_MAX; //No free bit found
 }
 
 uint64_t renamer::get_branch_mask(){
@@ -273,6 +258,7 @@ uint64_t renamer::get_branch_mask(){
 
 
 uint64_t renamer::checkpoint(){
+    //printf("%d: checkpoint()\n", retired_insn);
     //create a new branch checkpoint
     //allocate:
     //  1. GMB bit: starting from left or right? which way does this move? 
@@ -290,7 +276,7 @@ uint64_t renamer::checkpoint(){
     cp temp;
     // Shadow Map Table: copying over the AMT content
     temp.shadow_map_table = new uint64_t[this->shadow_map_table_size];
-    int i;
+    uint64_t i;
     for (i=0; i < this->shadow_map_table_size; i++){
         temp.shadow_map_table[i] = this->rmt[i];
     }
@@ -356,13 +342,15 @@ uint64_t renamer::dispatch_inst(bool dest_valid,
 
     active_list_entry->completed = false; //just dispatched
     active_list_entry->exception = false; //just dispatched
+    active_list_entry->br_mispredict = false;
+    active_list_entry->val_mispredict = false;
+    active_list_entry->load_violation = false;
     active_list_entry->is_load = load;
     active_list_entry->is_store = store;
     active_list_entry->is_branch = branch;
     active_list_entry->is_amo = amo;
     active_list_entry->is_csr = csr;
     active_list_entry->pc = PC;
-    //saving the index to return at the end of the function
 
     return idx_at_al;
 }
@@ -439,6 +427,7 @@ bool renamer::precommit(bool &completed,
                         bool &branch, bool &amo, bool &csr,
                         uint64_t &PC){
 
+
     if (this->active_list_is_empty()){
         return false; 
     }
@@ -470,6 +459,8 @@ void renamer::commit(){
     assert(al_head->completed == true);
     assert(al_head->exception == false);
     assert(al_head->load_violation == false);
+    //if (al_head->load_violation == true) printf("%lu: commit(): load_violation detected\n", al_head->pc);
+    //printf("%d: commit(): load_vio: %d\n", retired_insn, al_head->load_violation);
 
     //commit the instruction at the head of the active list
     //find the physical dst register by looking up the AMT with logical reg
@@ -519,12 +510,13 @@ bool renamer::retire_from_active_list(){
 }
 
 void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
+    //printf("%d: resolve(correct %d)\n", retired_insn, correct);
     if (correct){ //branch was predicted correctly
         //clear the GBM bit by indexing with branch_ID
         this->GBM  &= ~(1ULL<<branch_ID);
         //clear all the checkpointed GBMs;
-        int i;
-        for (i=0; i < this->num_checkpoints; i++){
+        uint64_t i;
+        for (i=0; i < num_checkpoints; i++){
             this->checkpoints[i].gbm &= ~(1ULL<<branch_ID);
         } 
 
@@ -543,8 +535,8 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
         this->GBM = misp_gbm;
 
         // * Restore the RMT using the branch's checkpoint.
-        int i;
-        for (i=0; i < shadow_map_table_size; i++){
+        uint64_t i;
+        for (i=0; i < this->shadow_map_table_size; i++){
             this->rmt[i] = this->checkpoints[branch_ID].shadow_map_table[i]; 
         }
         // * Restore the Free List head pointer and its phase bit,
@@ -554,6 +546,7 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
 
         // * Restore the Active List tail pointer and its phase bit
         //   corresponding to the entry after the branch's entry.
+        //if (this->active_list_is_full()) printf("We are running into the AL full edge case\n");
         this->al.tail = AL_index + 1;
         // AL cannot be empty, so it has to be partially full or completely
         // full.
@@ -584,9 +577,10 @@ void renamer::resolve(uint64_t AL_index, uint64_t branch_ID, bool correct){
 
 
 void renamer::squash(){
+    //printf("%lu: squash()\n", this->al.list[this->al.head].pc);
     //the renamer should be rolled back to the committed state of the machine
     //empty out the active list
-    int i;
+    uint64_t i;
     this->al.tail = this->al.head;
     this->al.tail_phase = this->al.head_phase;
     //clear out AL contents?
@@ -678,6 +672,7 @@ bool renamer::active_list_is_empty(){
 
 
 void renamer::init_al_entry(al_entry_t *ale){
+
     /* Initiate an Active List Entry with the correct type of values*/
     ale->has_dest=false;
     ale->logical=UINT64_MAX;
@@ -697,6 +692,7 @@ void renamer::init_al_entry(al_entry_t *ale){
 
 
 //Debugging helper functions
+/*
 void renamer::print_free_list(){
     uint64_t i=0;
     printf("--------------FREE LIST-------------------\n");
@@ -765,6 +761,7 @@ void renamer::print_active_list(bool between_head_and_tail){
         );
 
 }
+*/
 
 bool renamer::reg_in_amt(uint64_t phys_reg){
     uint64_t i;
